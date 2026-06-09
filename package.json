@@ -1,5 +1,6 @@
 {
   "name": "veherify",
+  "private": true,
   "version": "1.0.0",
   "description": "verify with hbar token",
   "keywords": [
@@ -13,18 +14,14 @@
     "type": "git",
     "url": "git+ssh://git@github.com/Caritajoe18/veherify.git"
   },
-  "license": "ISC",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "license": "Apache-2.0",
   "author": "carita",
   "type": "module",
-  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "@hashgraph/hedera-agent-kit": "^4.0.0",
-    "@hashgraph/hedera-agent-kit-langchain": "^1.0.0",
-    "@hiero-ledger/sdk": "^2.84.0",
-    "@langchain/openai": "^1.4.7",
-    "dotenv": "^17.4.2"
   }
 }

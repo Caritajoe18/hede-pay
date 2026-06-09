@@ -1,0 +1,11 @@
+{
+  "name": "@veherify/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"No frontend configured yet\"",
+    "build": "echo \"No frontend configured yet\"",
+    "start": "echo \"No frontend configured yet\""
+  }
+}

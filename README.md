@@ -46,22 +46,24 @@ We use **Hooks and Policies** to ensure the agent doesn't overspend its budget o
 ```text
 /veherify
 ├── /apps
-│   ├── /web        # Next.js Frontend (Wallet integration, Chat UI)
-│   └── /agent      # Hedera Agent Kit Backend (Forensic tools, HCS logging)
+│   ├── /web        # Frontend app (UI, wallet integration, chat interface)
+│   └── /agent      # Backend app (Hedera Agent Kit, forensic workflows, HCS logging)
 ├── /packages
-│   ├── /shared     # Shared types and protocol schemas (ACP/AP2/MPP)
-│   └── /ui         # Shared component library
-└── package.json    # Workspace configuration
+│   ├── /shared     # Shared types, protocol schemas, and utilities
+│   └── /ui         # Shared UI components and design system pieces
+└── package.json    # Root workspace configuration
 ```
+
+This repository uses an npm workspace layout, so each app can be developed and deployed independently while sharing common code.
 
 ---
 
 ## 🚀 Getting Started
 
 ### **Prerequisites**
-*   Node.js v18+ 
+*   Node.js v18+
 *   A **Hedera Testnet Account** ([Get one here](https://portal.hedera.com/)).
-*   API keys for your LLM (OpenAI, Gemini, or Groq).
+*   API keys for your LLM provider (OpenAI, Anthropic, Groq, etc.).
 
 ### **Quick Start**
 1.  **Clone the repo:**
@@ -73,12 +75,26 @@ We use **Hooks and Policies** to ensure the agent doesn't overspend its budget o
     ```bash
     npm install
     ```
-3.  **Configure Environment:**
-    Copy the `.env.example` to `.env` in both `/apps/web` and `/apps/agent` and add your Hedera credentials and API keys.
-4.  **Run Development Mode:**
+3.  **Configure environment files:**
     ```bash
-    pnpm dev
+    cp apps/agent/.env.example apps/agent/.env
+    cp apps/web/.env.example apps/web/.env
     ```
+4.  **Edit app env files:**
+    - `apps/agent/.env` should contain backend-only secrets like `ACCOUNT_ID`, `PRIVATE_KEY`, and API keys.
+    - `apps/web/.env` should only contain frontend-safe public values.
+
+5.  **Run each app separately:**
+    - Backend:
+      ```bash
+      cd apps/agent
+      npm run dev
+      ```
+    - Frontend:
+      ```bash
+      cd apps/web
+      npm run dev
+      ```
 
 ---
 
