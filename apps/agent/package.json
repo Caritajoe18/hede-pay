@@ -2,7 +2,11 @@
   "name": "@veherify/agent",
   "version": "0.1.0",
   "private": true,
+  "description": "",
+  "license": "Apache-2.0",
+  "author": "carita",
   "type": "module",
+  "main": "index.js",
   "scripts": {
     "dev": "node ./src/index.js",
     "start": "node ./src/index.js"
@@ -11,6 +15,8 @@
     "@hashgraph/hedera-agent-kit": "^4.0.0",
     "@hashgraph/hedera-agent-kit-langchain": "^1.0.0",
     "@hiero-ledger/sdk": "^2.84.0",
+    "@langchain/groq": "^1.2.1",
+    "@langchain/ollama": "^1.2.7",
     "@langchain/openai": "^1.4.7",
     "dotenv": "^17.4.2"
   }
