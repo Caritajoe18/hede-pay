@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const summaryCards = [
   {
@@ -89,7 +89,18 @@ type Message = {
 };
 
 function App() {
-  const [view, setView] = useState<"landing" | "login" | "signup" | "dashboard">("dashboard");
+  const getViewFromHash = (): "landing" | "login" | "signup" | "dashboard" => {
+    const hash = window.location.hash.replace("#", "");
+    if (hash === "login") return "login";
+    if (hash === "signup") return "signup";
+    if (hash === "dashboard") return "dashboard";
+    return "landing";
+  };
+  const [view, setView] = useState<"landing" | "login" | "signup" | "dashboard">(getViewFromHash);
+  const navigate = useCallback((to: string) => {
+    window.location.hash = to;
+    setView(to as any);
+  }, []);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -115,6 +126,12 @@ function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const onHashChange = () => navigate(getViewFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   const addActivity = (type: ActivityEvent["type"], message: string) => {
     const now = new Date();
@@ -271,8 +288,8 @@ function App() {
           <a href="#contact">Contact</a>
         </div>
         <div className="nav-actions">
-          <button type="button" className="button-alt" onClick={() => setView("login")}>Login</button>
-          <button type="button" onClick={() => setView("signup")}>Sign Up</button>
+          <button type="button" className="button-alt" onClick={() => navigate("login")}>Login</button>
+          <button type="button" onClick={() => navigate("signup")}>Sign Up</button>
         </div>
       </nav>
 
@@ -284,8 +301,8 @@ function App() {
             HedePay automates payroll disbursements using Hedera policies and immutable HCS audit trails. The result is secure salary payment, compliance enforcement, and transparent reporting in a single enterprise dashboard.
           </p>
           <div className="hero-actions landing-actions">
-            <button type="button" onClick={() => setView("signup")}>Get started</button>
-            <button type="button" className="button-alt" onClick={() => setView("login")}>Login</button>
+            <button type="button" onClick={() => navigate("signup")}>Get started</button>
+            <button type="button" className="button-alt" onClick={() => navigate("login")}>Login</button>
           </div>
         </div>
         <div className="hero-panel-visual">
@@ -340,9 +357,27 @@ function App() {
           <p>
             Whether you are launching a new Hedera payroll flow or upgrading existing payroll controls, HedePay gives teams an easy onboarding path with enterprise-level policy governance and audit visibility.
           </p>
-          <button type="button" onClick={() => setView("signup")}>Create account</button>
+          <button type="button" onClick={() => navigate("signup")}>Create account</button>
         </div>
       </section>
+
+      <footer className="landing-footer">
+        <div className="footer-content">
+          <div className="footer-brand">
+            <span className="eyebrow">HedePay</span>
+            <p>Autonomous payroll for Hedera-native enterprises.</p>
+          </div>
+          <div className="footer-links">
+            <a href="#home">Home</a>
+            <a href="#about">About</a>
+            <a href="#features">Features</a>
+            <a href="#contact">Contact</a>
+          </div>
+          <div className="footer-copy">
+            <p>&copy; 2026 HedePay. Built on Hedera.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 
@@ -364,9 +399,9 @@ function App() {
         <div className="auth-card">
           <div className="auth-header">
             <h2>{mode === "login" ? "Login" : "Sign Up"}</h2>
-            <button type="button" className="button-alt small" onClick={() => setView("landing")}>Back</button>
+            <button type="button" className="button-alt small" onClick={() => navigate("landing")}>Back</button>
           </div>
-          <form className="auth-form" onSubmit={(event) => { event.preventDefault(); setView("dashboard"); }}>
+          <form className="auth-form" onSubmit={(event) => { event.preventDefault(); navigate("dashboard"); }}>
             <label>
               Email
               <input type="email" placeholder="name@company.com" required />
@@ -402,7 +437,7 @@ function App() {
             <span className="agent-dot" />
             Autonomous Mode
           </span>
-          <button type="button" className="button-alt small" onClick={() => setView("landing")}>Sign out</button>
+          <button type="button" className="button-alt small" onClick={() => navigate("landing")}>Sign out</button>
         </div>
       </header>
 
