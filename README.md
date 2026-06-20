@@ -1,102 +1,104 @@
-# VeHERify: Tracing the Untraceable
+# **HedePay: The Autonomous Hedera Payroll Agent**
 
-Welcome to the **VeHERify (powered by HEDERA 😊). This detective built for the Hedera network, designed to uncover the origins of images and videos even when their metadata has been stripped or their sources deliberately obscured.
+**HedePay** is a governed, autonomous financial agent built using the **Hedera Agent Kit (v4)**. It is designed to automate enterprise payroll disbursements in HBAR and USDC while enforcing strict compliance via **Hooks and Policies**. By leveraging the **Hedera Consensus Service (HCS)** for immutable audit trails and the **Machine Payments Protocol (MPP)** for tax compliance APIs, HedePay ensures that every salary payment is verifiable, transparent, and secure.
 
----
-
-## What is an "AI Agent"? (For the Uninitiated)
-If you’ve used chatbots like Gemini or ChatGPT, you know they are great at talking. An **AI Agent**, however, is a chatbot with **"hands and a wallet."** 
-
-Instead of just answering questions, this agent can:
-*   **Take Action:** It can perform deep-web searches and use forensic tools autonomously.
-*   **Transact:** It has a digital wallet to pay for API services or receive payments in HBAR.
-*   **Remember Verifiably:** It records its findings on a public ledger (Hedera) so they can never be tampered with or deleted.
+This project is submitted for the **"Hedera Policy Agent"** bounty, demonstrating practical use cases for AI agents purchasing real services while operating under runtime constraints [Turn 18, Turn 24].
 
 ---
 
-## Project Overview (For the Developers)
-This is a **monorepo** containing a frontend and a Node.js/TypeScript backend powered by the **Hedera Agent Kit**. The agent leverages advanced OSINT (Open-Source Intelligence) tools and vision-capable LLMs to trace media origins.
+## ** Key Features**
 
-### **Core Stack**
-*   **Framework:** [Hedera Agent Kit (JS)](https://github.com/hashgraph/hedera-agent-kit-js).
-*   **Network:** Hedera (HCS for audit trails, HTS for asset verification).
-*   **Payment Gating:** Machine Payments Protocol (MPP) for pay-per-search functionality.
-*   **Standards:** Integrated with ACP (Agentic Commerce Protocol) and AP2 (Agent Payments Protocol) for interoperable agentic commerce.
-
----
-
-## Key Features
-
-### **1. Pay-Per-Forensics (MPP Integration)**
-Using the **Machine Payments Protocol**, the agent implements a "charge" model. Users pay a specific amount of HBAR to trigger a "Deep Search" workflow. This uses the **HTTP 402 "Payment Required"** scheme to ensure the service is only rendered upon successful transaction.
-
-### **2. Verifiable Audit Trails (HCS)**
-Every search result and origin proof is hashed and submitted to a **Hedera Consensus Service (HCS) Topic**. This creates a transparent, immutable record of the forensic process, preventing "fake news" or tampered evidence.
-
-### **3. Autonomous Discovery (ACP & AP2)**
-*   **ACP:** Our agent is discoverable by other shopping or research agents, allowing it to act as a sub-service in larger automated workflows.
-*   **AP2:** Ensures secure, interoperable payment requests between the agent's UI and the user's wallet.
-
-### **4. Security Guardrails**
-We use **Hooks and Policies** to ensure the agent doesn't overspend its budget or access unauthorized tools, enforcing business logic directly at the code level.
+*   **Autonomous Payroll Execution:** Operates in `AgentMode.AUTONOMOUS` to handle multi-account salary disbursements without constant manual intervention.
+*   **Policy-Governed Disbursements:** Implements **MaxSpendPolicies** and **WhitelistPolicies** to prevent overspending and ensure funds are only sent to authorized employee accounts [39, Turn 24].
+*   **Immutable Audit Trails:** Every payroll cycle and policy denial is logged to a specific **HCS Topic**, creating a permanent ledger of corporate financial activity [39, Turn 18].
+*   **x402-Gated API Integration:** Uses the **MPPX Hedera Plugin** to pay for third-party tax and compliance APIs in HBAR/USDC before executing transfers [72, Turn 18].
+*   **Multi-Model Support:** Compatible with **OpenAI (GPT-4o)**, **Groq**, and **Ollama** for 100% local, private execution.
 
 ---
 
-## 📂 Repository Structure
+## **📁 Project Structure**
+
+HedePay uses a **pnpm monorepo** architecture to separate concerns between the AI logic and the user interface [34, Turn 19]:
+
 ```text
-/veherify
+/hedepay
 ├── /apps
-│   ├── /web        # Frontend app (UI, wallet integration, chat interface)
-│   └── /agent      # Backend app (Hedera Agent Kit, forensic workflows, HCS logging)
+│   ├── /web        # Next.js Frontend (Payroll dashboard & policy status)
+│   └── /agent      # Node.js Backend (HAK v4, LangChain, Payroll Logic)
 ├── /packages
-│   ├── /shared     # Shared types, protocol schemas, and utilities
-│   └── /ui         # Shared UI components and design system pieces
-└── package.json    # Root workspace configuration
+│   ├── /shared     # Shared Zod schemas for payroll & employee records
+│   └── /ui         # Shared UI components (Tailwind/Radix)
+└── package.json    # Workspace configuration
 ```
 
-This repository uses an npm workspace layout, so each app can be developed and deployed independently while sharing common code.
+---
+
+## **🛠️ Tech Stack**
+
+*   **Blockchain:** Hedera Network (Testnet).
+*   **Framework:** [Hedera Agent Kit v4](https://github.com/hashgraph/hedera-agent-kit-js).
+*   **AI Orchestration:** [LangChain v1](https://github.com/langchain-ai/langchain).
+*   **Payments Protocol:** [Machine Payments Protocol (MPPX)](https://mpp.dev) for 402-protected API calls.
+*   **SDK:** [Hiero SDK](https://github.com/hashgraph/hedera-sdk-js).
 
 ---
 
-## 🚀 Getting Started
+## **⚙️ Getting Started**
 
-### **Prerequisites**
-*   Node.js v18+
-*   A **Hedera Testnet Account** ([Get one here](https://portal.hedera.com/)).
-*   API keys for your LLM provider (OpenAI, Anthropic, Groq, etc.).
+### **1. Prerequisites**
+*   **Node.js** v20 or higher.
+*   A **Hedera Testnet Account** (Get one at [portal.hedera.com](https://portal.hedera.com/dashboard)).
+*   An LLM API Key (OpenAI/Groq) or **Ollama** installed locally.
 
-### **Quick Start**
-1.  **Clone the repo:**
-    ```bash
-    git clone https://github.com/Caritajoe18/veherify.git
-    cd veherify
-    ```
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-3.  **Configure environment files:**
-    ```bash
-    cp apps/agent/.env.example apps/agent/.env
-    cp apps/web/.env.example apps/web/.env
-    ```
-4.  **Edit app env files:**
-    - `apps/agent/.env` should contain backend-only secrets like `ACCOUNT_ID`, `PRIVATE_KEY`, and API keys.
-    - `apps/web/.env` should only contain frontend-safe public values.
+### **2. Installation**
+```bash
+# Install core dependencies across the monorepo
+npm install @hashgraph/hedera-agent-kit @hashgraph/hedera-agent-kit-langchain @hiero-ledger/sdk
+```
 
-5.  **Run each app separately:**
-    - Backend:
-      ```bash
-      cd apps/agent
-      npm run dev
-      ```
-    - Frontend:
-      ```bash
-      cd apps/web
-      npm run dev
-      ```
+### **3. Environment Configuration**
+Create a `.env` file in `/apps/agent`:
+```env
+ACCOUNT_ID=0.0.xxxxxx
+PRIVATE_KEY=302e...
+HEDERA_NETWORK=testnet
+OPENAI_API_KEY=sk-... # Or GROQ_API_KEY
+```
 
 ---
 
-## 📜 License
+## ** Bounty Compliance: Hooks & Policies**
+
+To meet the **Hedera Policy Agent** criteria, HedePay implements a layered defense system :
+
+### **The Spend Limit Policy**
+The agent is restricted by a **MaxSpendPolicy** that blocks any single disbursement exceeding a defined USDC threshold. This prevents accidental massive outflows [39, Turn 24].
+
+### **The Employee Whitelist**
+Using the **WhitelistPolicy**, the agent can only interact with the `CoreTransferPlugin` if the `targetAccountId` exists within the corporate employee directory [Turn 18, Turn 24].
+
+### **Audit Hook**
+Every action—whether successful or blocked by a policy—is processed through a **BaseTool-enhanced hook** that submits the transaction record to **HCS**. This ensures "verifiable and transparent" behavior as required by the AI Studio.
+
+---
+
+## **📖 Usage Examples**
+
+Once the agent is running in its REPL or connected to the web UI, you can issue commands such as:
+
+*   **Disbursement:** *"Disburse monthly salaries to all employees in the 'Engineering' whitelist."*
+*   **Compliance:** *"Check the tax compliance API for the next payroll cycle using USDC."*
+*   **Balance:** *"What is the remaining payroll budget in HBAR?"*
+*   **Audit:** *"Show me the HCS message records for the last payroll execution."*
+
+---
+
+## **📝 Feedback & Hosting**
+
+*   **Feedback:** A detailed developer experience report is included in `FEEDBACK.md` [Turn 21].
+*   **Live Demo:** The agent is hosted at `[YOUR_DEPLOYED_URL]` and will remain active for at least 90 days following submission [Turn 18].
+
+---
+
+## **⚖️ License**
 This project is licensed under the **Apache 2.0 License**.
