@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const summaryCards = [
   {
@@ -62,8 +62,201 @@ const policies = [
   },
 ];
 
+const guardrails = [
+  { label: "Max Spend Limit", value: "30,000 USDC per transfer" },
+  { label: "Employee Whitelist", value: "42 approved accounts" },
+  { label: "Department Scope", value: "Engineering, Operations, Contractors" },
+];
+
+const employees = [
+  { id: "0.0.9821", name: "Alice Chen", dept: "Engineering", salary: "12,500 USDC" },
+  { id: "0.0.9822", name: "Bob Martinez", dept: "Engineering", salary: "11,800 USDC" },
+  { id: "0.0.9823", name: "Carol Singh", dept: "Engineering", salary: "13,200 USDC" },
+  { id: "0.0.9824", name: "David Kim", dept: "Engineering", salary: "10,900 USDC" },
+  { id: "0.0.9825", name: "Eve Johnson", dept: "Engineering", salary: "14,100 USDC" },
+];
+
+type ActivityEvent = {
+  id: number;
+  type: "compliance" | "mpp" | "hcs" | "policy" | "approval";
+  message: string;
+  timestamp: string;
+};
+
+type Message = {
+  role: "user" | "agent";
+  text: string;
+};
+
 function App() {
-  const [view, setView] = useState<"landing" | "login" | "signup" | "dashboard">("landing");
+  const [view, setView] = useState<"landing" | "login" | "signup" | "dashboard">("dashboard");
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "agent",
+      text: "Welcome to HedePay. I'm your payroll agent. Active guardrails: max 30,000 USDC per transfer, 42 whitelisted employees. How would you like to proceed?",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([
+    { id: 1, type: "policy", message: "Agent initialized with whitelist and max spend policies", timestamp: "09:32:15" },
+  ]);
+  const [nextActivityId, setNextActivityId] = useState(2);
+  const [showHITL, setShowHITL] = useState(false);
+  const [hitlDetails, setHitlDetails] = useState({ amount: "", reason: "" });
+  const [showAuditConfirm, setShowAuditConfirm] = useState(false);
+  const [hcsTopic, setHcsTopic] = useState("0.0.0.0");
+  const [payrollCycleId, setPayrollCycleId] = useState(0);
+  const [payrollRunActive, setPayrollRunActive] = useState(false);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const addActivity = (type: ActivityEvent["type"], message: string) => {
+    const now = new Date();
+    const timestamp = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    setActivityFeed((prev) => [{ id: nextActivityId, type, message, timestamp }, ...prev]);
+    setNextActivityId((id) => id + 1);
+  };
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const simulatePayrollRun = async (department: string, currency: string) => {
+    setIsProcessing(true);
+    setPayrollRunActive(true);
+
+    addActivity("policy", `Checking whitelist for ${department} department employees...`);
+    await sleep(800);
+
+    const deptEmployees = employees.filter((e) => e.dept.toLowerCase() === department.toLowerCase());
+    if (deptEmployees.length === 0) {
+      setMessages((prev) => [...prev, { role: "agent", text: `No employees found in the ${department} department whitelist.` }]);
+      setIsProcessing(false);
+      setPayrollRunActive(false);
+      return;
+    }
+
+    const employeeList = deptEmployees.map((e) => `${e.name} (${e.id})`).join(", ");
+    setMessages((prev) => [
+      ...prev,
+      { role: "agent", text: `Found ${deptEmployees.length} whitelisted employees in ${department}: ${employeeList}. Preparing transfers in ${currency}.` },
+    ]);
+    addActivity("policy", `${deptEmployees.length} whitelisted employees identified in ${department}`);
+    await sleep(1000);
+
+    addActivity("mpp", "Initiating MPP compliance payment: $0.01 USDC to verify tax withholding for this cycle");
+    setMessages((prev) => [
+      ...prev,
+      { role: "agent", text: `Paying $0.01 ${currency} via MPP to verify tax withholding for this cycle.` },
+    ]);
+    await sleep(1200);
+    addActivity("mpp", "MPP compliance check completed — tax withholding verified");
+
+    const totalAmount = deptEmployees.reduce((sum, e) => {
+      const num = parseInt(e.salary.replace(/[^0-9]/g, ""));
+      return sum + num;
+    }, 0);
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "agent", text: `Compliance check passed. Total disbursement: ${totalAmount.toLocaleString()} ${currency}. Checking against max spend policy...` },
+    ]);
+    addActivity("compliance", `Total ${totalAmount.toLocaleString()} ${currency} — checking against 30,000 USDC max spend limit`);
+    await sleep(800);
+
+    if (totalAmount > 30000) {
+      setHitlDetails({ amount: `${totalAmount.toLocaleString()} ${currency}`, reason: "Exceeds daily max spend limit of 30,000 USDC" });
+      setShowHITL(true);
+      addActivity("policy", `HITL triggered: ${totalAmount.toLocaleString()} ${currency} exceeds 30,000 USDC limit`);
+      setIsProcessing(false);
+      return;
+    }
+
+    await completePayroll(totalAmount, currency, deptEmployees);
+  };
+
+  const completePayroll = async (totalAmount: number, currency: string, deptEmployees: typeof employees) => {
+    for (const emp of deptEmployees) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "agent", text: `Disbursing ${emp.salary} to ${emp.name} (${emp.id})...` },
+      ]);
+      addActivity("compliance", `Transferring ${emp.salary} to ${emp.name} — policy check passed`);
+      await sleep(600);
+    }
+
+    const cycleId = Math.floor(Math.random() * 900) + 100;
+    const topic = `0.0.${Math.floor(Math.random() * 900000) + 100000}`;
+    setPayrollCycleId(cycleId);
+    setHcsTopic(topic);
+
+    addActivity("hcs", `Payroll Cycle #${cycleId} logged to HCS Topic ${topic}`);
+    setShowAuditConfirm(true);
+    setPayrollRunActive(false);
+  };
+
+  const handleHITLApprove = async () => {
+    setShowHITL(false);
+    setMessages((prev) => [...prev, { role: "agent", text: "Override approved. Proceeding with disbursement." }]);
+    addActivity("approval", "Human-in-the-loop override approved — proceeding with disbursement");
+
+    const matches = hitlDetails.amount.match(/[\d,]+/);
+    const totalAmount = matches ? parseInt(matches[0].replace(/,/g, "")) : 0;
+    await completePayroll(totalAmount, "USDC", employees.filter((e) => e.dept === "Engineering"));
+  };
+
+  const handleHITLDeny = () => {
+    setShowHITL(false);
+    setMessages((prev) => [...prev, { role: "agent", text: "Transaction denied. Payroll run cancelled. Adjust policy limits or reduce transfer amounts and try again." }]);
+    addActivity("approval", "Human-in-the-loop override denied — payroll run cancelled");
+    setIsProcessing(false);
+    setPayrollRunActive(false);
+  };
+
+  const handleSend = async () => {
+    const cmd = input.trim();
+    if (!cmd || isProcessing) return;
+
+    setMessages((prev) => [...prev, { role: "user", text: cmd }]);
+    setInput("");
+    addActivity("compliance", `Processing command: "${cmd}"`);
+
+    const cmdLower = cmd.toLowerCase();
+    const deptMatch = cmdLower.match(/(engineering|operations|contractors?)\s*(department)?/);
+    const currency = cmdLower.includes("hbar") ? "HBAR" : "USDC";
+    const department = deptMatch ? deptMatch[1] : "Engineering";
+
+    if (cmdLower.includes("disburse") || cmdLower.includes("pay") || cmdLower.includes("send salary") || cmdLower.includes("payroll")) {
+      const deptDisplay = department.charAt(0).toUpperCase() + department.slice(1).replace(/s$/, "");
+      await sleep(500);
+      setMessages((prev) => [...prev, { role: "agent", text: `Initiating payroll run for ${deptDisplay} department in ${currency}. Identifying employees from the whitelist...` }]);
+      addActivity("policy", `Payroll initiation: ${deptDisplay} department, ${currency}`);
+      await simulatePayrollRun(deptDisplay, currency);
+    } else if (cmdLower.includes("hello") || cmdLower.includes("hi") || cmdLower.includes("hey")) {
+      await sleep(400);
+      setMessages((prev) => [...prev, { role: "agent", text: "Hello! I'm your HedePay payroll agent. I can help disburse salaries, check policies, or review audit logs. Active guardrails: 30,000 USDC max per transfer, 42 whitelisted employees." }]);
+    } else if (cmdLower.includes("policy") || cmdLower.includes("guardrail") || cmdLower.includes("limit")) {
+      await sleep(400);
+      setMessages((prev) => [...prev, { role: "agent", text: "Active policies:\n- Max Spend Limit: 30,000 USDC per transfer\n- Employee Whitelist: 42 approved accounts\n- Department Scope: Engineering, Operations, Contractors\n- HCS Audit Hook: Live (all transactions logged immutably)" }]);
+    } else if (cmdLower.includes("audit") || cmdLower.includes("log") || cmdLower.includes("hcs")) {
+      await sleep(400);
+      setMessages((prev) => [...prev, { role: "agent", text: `Recent audit events logged to HCS. Last payroll cycle recorded on Topic 0.0.895234. All transactions are immutable and verifiable on the Hedera network.` }]);
+    } else {
+      await sleep(400);
+      setMessages((prev) => [...prev, { role: "agent", text: "I didn't recognize that command. Try saying:\n- \"Disburse monthly salaries to the Engineering department in USDC\"\n- \"Show active policies\"\n- \"View audit logs\"" }]);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   const renderLanding = () => (
     <div className="app-shell landing-shell">
@@ -198,87 +391,185 @@ function App() {
   );
 
   const renderDashboard = () => (
-    <div className="app-shell">
-      <header className="hero-panel">
-        <div>
+    <div className="app-shell dash-shell">
+      <header className="dash-header">
+        <div className="dash-header-left">
           <span className="eyebrow">HedePay</span>
-          <h1>Autonomous Hedera Payroll Dashboard</h1>
-          <p>
-            Monitor payroll disbursements, policy compliance, and HCS audit trails from a single agent dashboard.
-          </p>
+          <h1>Payroll Dashboard</h1>
         </div>
-        <div className="hero-actions">
-          <button type="button">Review policies</button>
-          <button type="button" className="button-alt">
-            Inspect audit logs
-          </button>
+        <div className="dash-header-right">
+          <span className="agent-badge">
+            <span className="agent-dot" />
+            Autonomous Mode
+          </span>
+          <button type="button" className="button-alt small" onClick={() => setView("landing")}>Sign out</button>
         </div>
       </header>
 
-      <section className="summary-grid">
-        {summaryCards.map((card) => (
-          <article key={card.title} className="summary-card">
-            <h2>{card.title}</h2>
-            <p className="value">{card.value}</p>
-            <p className="detail">{card.detail}</p>
-          </article>
+      <section className="guardrail-bar">
+        {guardrails.map((g) => (
+          <div key={g.label} className="guardrail-chip">
+            <span className="guardrail-label">{g.label}</span>
+            <strong>{g.value}</strong>
+          </div>
         ))}
       </section>
 
-      <section className="content-grid">
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="panel-label">Latest payroll executions</p>
-              <h2>Recent runs</h2>
+      <div className="dash-layout">
+        <div className="dash-main">
+          <div className="chat-panel">
+            <div className="chat-header">
+              <h2>Conversational Agent</h2>
+              <span className="chat-status">
+                <span className={`status-indicator ${isProcessing || payrollRunActive ? "processing" : "idle"}`} />
+                {isProcessing || payrollRunActive ? "Processing..." : "Ready"}
+              </span>
             </div>
-            <button type="button" className="panel-button">
-              Refresh data
-            </button>
-          </div>
 
-          <div className="table-list">
-            <div className="table-row header-row">
-              <span>Run</span>
-              <span>Date</span>
-              <span>Status</span>
-              <span>Amount</span>
-            </div>
-            {payRuns.map((run) => (
-              <div key={run.name} className="table-row">
-                <span>{run.name}</span>
-                <span>{run.date}</span>
-                <span>{run.status}</span>
-                <span>{run.amount}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel panel-secondary">
-          <div className="panel-header">
-            <div>
-              <p className="panel-label">Compliance snapshot</p>
-              <h2>Policy health</h2>
-            </div>
-            <button type="button" className="panel-button button-alt">
-              View rules
-            </button>
-          </div>
-
-          <div className="policy-list">
-            {policies.map((policy) => (
-              <article key={policy.label} className="policy-card">
-                <div>
-                  <p>{policy.label}</p>
-                  <strong>{policy.value}</strong>
+            <div className="chat-messages">
+              {messages.map((msg, i) => (
+                <div key={i} className={`chat-msg ${msg.role}`}>
+                  <div className="chat-msg-avatar">
+                    {msg.role === "agent" ? "A" : "U"}
+                  </div>
+                  <div className="chat-msg-content">
+                    <div className="chat-msg-role">{msg.role === "agent" ? "Payroll Agent" : "You"}</div>
+                    <div className="chat-msg-text">{msg.text}</div>
+                  </div>
                 </div>
-                <span>{policy.status}</span>
-              </article>
-            ))}
+              ))}
+              {isProcessing && (
+                <div className="chat-msg agent">
+                  <div className="chat-msg-avatar">A</div>
+                  <div className="chat-msg-content">
+                    <div className="chat-msg-role">Payroll Agent</div>
+                    <div className="typing-indicator">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="chat-input-area">
+              <textarea
+                className="chat-input"
+                placeholder="e.g. Disburse monthly salaries to the Engineering department in USDC"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={2}
+                disabled={isProcessing}
+              />
+              <button className="chat-send" onClick={handleSend} disabled={!input.trim() || isProcessing}>
+                Send
+              </button>
+            </div>
           </div>
         </div>
-      </section>
+
+        <div className="dash-side">
+          <div className="side-panel">
+            <div className="side-panel-header">
+              <h3>Active Guardrails</h3>
+            </div>
+            <div className="policy-list">
+              {policies.map((policy) => (
+                <article key={policy.label} className="policy-card">
+                  <div>
+                    <p>{policy.label}</p>
+                    <strong>{policy.value}</strong>
+                  </div>
+                  <span>{policy.status}</span>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="side-panel">
+            <div className="side-panel-header">
+              <h3>Agent Activity</h3>
+            </div>
+            <div className="activity-feed">
+              {activityFeed.map((event) => (
+                <div key={event.id} className={`activity-item ${event.type}`}>
+                  <span className="activity-icon">
+                    {event.type === "policy" && "⚙"}
+                    {event.type === "mpp" && "�"}
+                    {event.type === "hcs" && "�"}
+                    {event.type === "compliance" && "✓"}
+                    {event.type === "approval" && "�"}
+                  </span>
+                  <div className="activity-content">
+                    <p>{event.message}</p>
+                    <span className="activity-time">{event.timestamp}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="side-panel">
+            <div className="side-panel-header">
+              <h3>Recent Runs</h3>
+            </div>
+            <div className="table-list mini-table">
+              <div className="table-row header-row">
+                <span>Run</span>
+                <span>Status</span>
+                <span>Amount</span>
+              </div>
+              {payRuns.map((run) => (
+                <div key={run.name} className="table-row mini-row">
+                  <span className="mini-name">{run.name}</span>
+                  <span className={`mini-status ${run.status === "Settled" ? "status-settled" : run.status === "Approved" ? "status-approved" : "status-review"}`}>{run.status}</span>
+                  <span className="mini-amount">{run.amount}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showHITL && (
+        <div className="modal-overlay">
+          <div className="modal-content hitl-modal">
+            <div className="modal-icon">�</div>
+            <h2>Human Approval Required</h2>
+            <p className="hitl-desc">
+              This transfer of <strong>{hitlDetails.amount}</strong> exceeds the daily limit.
+            </p>
+            <p className="hitl-reason">{hitlDetails.reason}</p>
+            <p className="hitl-instruction">Please sign to approve or deny this transaction.</p>
+            <div className="modal-actions">
+              <button type="button" className="button-alt modal-btn" onClick={handleHITLDeny}>Deny</button>
+              <button type="button" className="modal-btn modal-approve" onClick={handleHITLApprove}>Sign & Approve</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAuditConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-content audit-modal">
+            <div className="modal-icon">📋</div>
+            <h2>Payroll Cycle Complete</h2>
+            <div className="audit-detail">
+              <p>Payroll Cycle <strong>#{payrollCycleId}</strong> immutably logged to HCS</p>
+              <div className="hcs-topic">Topic {hcsTopic}</div>
+            </div>
+            <p className="audit-note">
+              All transactions are verifiable on the Hedera network. Share this topic with your accounting team for reconciliation.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="modal-btn modal-approve" onClick={() => setShowAuditConfirm(false)}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
