@@ -2,14 +2,16 @@
   "name": "@veherify/agent",
   "version": "0.1.0",
   "private": true,
-  "description": "",
+  "description": "VeHERify — forensic AI agent for tracing media origins on Hedera",
   "license": "Apache-2.0",
   "author": "carita",
   "type": "module",
-  "main": "index.js",
   "scripts": {
-    "dev": "node ./src/index.js",
-    "start": "node ./src/index.js"
+    "dev": "tsx watch src/index.ts",
+    "start": "node --loader tsx src/index.ts",
+    "build": "tsc",
+    "compile": "tsc --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hashgraph/hedera-agent-kit": "^4.0.0",
@@ -18,6 +20,13 @@
     "@langchain/groq": "^1.2.1",
     "@langchain/ollama": "^1.2.7",
     "@langchain/openai": "^1.4.7",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "hak-mppx-hedera-plugin": "^1.2.0",
+    "langchain": "^1.2.24"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.22.0",
+    "typescript": "^5.7.0"
   }
 }
