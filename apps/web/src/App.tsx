@@ -1,28 +1,28 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-const summaryCards = [
+const INITIAL_MPP_SERVICES = [
   {
-    title: "Payroll Budget",
-    value: "420,000 USDC",
-    detail: "Available balance for current payroll cycle",
+    id: "tax_calc",
+    name: "Global Tax Compliance API",
+    url: "https://api.tax-service.com/v1/calculate",
+    cost: "Unknown",
+    description: "Real-time tax withholding calculation"
   },
   {
-    title: "Policy Status",
-    value: "Active",
-    detail: "Whitelist and max spend rules are enforced",
+    id: "ai_summary",
+    name: "HedePay AI Auditor (GPT-4o)",
+    url: "https://mpp-proxy.com/openai/v1/chat/completions",
+    cost: "Unknown",
+    description: "Generate natural language payroll summaries"
   },
   {
-    title: "Audit Trail",
-    value: "23 events",
-    detail: "Immutable HCS logs captured this month",
-  },
-  {
-    title: "Agent Mode",
-    value: "Autonomous",
-    detail: "Agent is monitoring payroll operations",
-  },
+    id: "id_verify",
+    name: "Terminal 3 Identity Verification",
+    url: "https://api.t3n.network/verify",
+    cost: "Unknown",
+    description: "Verify employee proof-of-personhood"
+  }
 ];
-
 const payRuns = [
   {
     name: "Engineering Payroll",
@@ -42,30 +42,6 @@ const payRuns = [
     status: "Approved",
     amount: "31,800 USDC",
   },
-];
-
-const policies = [
-  {
-    label: "Max Spend Policy",
-    value: "30,000 USDC per transfer",
-    status: "Compliant",
-  },
-  {
-    label: "Whitelist Policy",
-    value: "42 approved accounts",
-    status: "Enabled",
-  },
-  {
-    label: "HCS Audit Hook",
-    value: "Live",
-    status: "Streaming",
-  },
-];
-
-const guardrails = [
-  { label: "Max Spend Limit", value: "30,000 USDC per transfer" },
-  { label: "Employee Whitelist", value: "42 approved accounts" },
-  { label: "Department Scope", value: "Engineering, Operations, Contractors" },
 ];
 
 const employees = [
@@ -89,6 +65,75 @@ type Message = {
 };
 
 function App() {
+  const [hbarBalance, setHbarBalance] = useState("Loading...");
+  const [maxSpendLimit, setMaxSpendLimit] = useState("30,000 USDC per transfer");
+
+  const fetchBalance = async () => {
+    setHbarBalance("Loading...");
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: "What is my current HBAR balance?" }),
+      });
+      const data = await response.json();
+      setHbarBalance(data.content);
+    } catch (e) {
+      setHbarBalance("Connection Error");
+    }
+  };
+
+  useEffect(() => {
+    fetchBalance();
+  }, []);
+
+  const summaryCards = [
+    {
+      title: "Treasury Balance",
+      value: hbarBalance,
+      detail: "Available HBAR for gas and payroll fees",
+    },
+    {
+      title: "Policy Status",
+      value: "Active",
+      detail: "Whitelist and max spend rules are enforced",
+    },
+    {
+      title: "Audit Trail",
+      value: "23 events",
+      detail: "Immutable HCS logs captured this month",
+    },
+    {
+      title: "Agent Mode",
+      value: "Autonomous",
+      detail: "Agent is monitoring payroll operations",
+    },
+  ];
+
+  const policies = [
+    {
+      label: "Max Spend Policy",
+      value: maxSpendLimit,
+      status: "Compliant",
+    },
+    {
+      label: "Whitelist Policy",
+      value: "42 approved accounts",
+      status: "Enabled",
+    },
+    {
+      label: "HCS Audit Hook",
+      value: "Live",
+      status: "Streaming",
+    },
+  ];
+
+  const guardrails = [
+    { label: "Max Spend Limit", value: maxSpendLimit },
+    { label: "Employee Whitelist", value: "42 approved accounts" },
+    { label: "Department Scope", value: "Engineering, Operations, Contractors" },
+  ];
+
   const getViewFromHash = (): "landing" | "login" | "signup" | "dashboard" => {
     const hash = window.location.hash.replace("#", "");
     if (hash === "login") return "login";
@@ -105,7 +150,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
-      text: "Welcome to HedePay. I'm your payroll agent. Active guardrails: max 30,000 USDC per transfer, 42 whitelisted employees. How would you like to proceed?",
+      text: "Welcome to HedePay. I'm your payroll agent. Active guardrails: max 1000 HBar per transfer, How would you like to proceed?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -120,6 +165,9 @@ function App() {
   const [hcsTopic, setHcsTopic] = useState("0.0.0.0");
   const [payrollCycleId, setPayrollCycleId] = useState(0);
   const [payrollRunActive, setPayrollRunActive] = useState(false);
+  const [mppServices, setMppServices] = useState(INITIAL_MPP_SERVICES);
+  const [isCheckingPrice, setIsCheckingPrice] = useState(false);
+  const [selectedService, setSelectedService] = useState(INITIAL_MPP_SERVICES[0]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -138,6 +186,52 @@ function App() {
     const timestamp = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
     setActivityFeed((prev) => [{ id: nextActivityId, type, message, timestamp }, ...prev]);
     setNextActivityId((id) => id + 1);
+  };
+
+  const handlePriceCheck = async (serviceId: string) => {
+    const service = mppServices.find(s => s.id === serviceId);
+    if (!service || isCheckingPrice) return;
+
+    setIsCheckingPrice(true);
+    addActivity("mpp", `Checking price for ${service.name}...`);
+
+    try {
+      const prompt = `Ping ${service.url} using the mppx_hedera_charge_fetch_tool GET method. Do not execute the payment. Just tell me the exact USDC cost requested by the server's 402 challenge.`;
+
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt }),
+      });
+
+      const data = await res.json();
+
+      setMppServices(prev => prev.map(s =>
+        s.id === serviceId ? { ...s, cost: data.content } : s
+      ));
+
+      addActivity("mpp", `Service Cost Reported: ${data.content}`);
+      setMessages(prev => [...prev, { role: "agent", text: `The current fee for ${service.name} is ${data.content}.` }]);
+    } catch (error) {
+      addActivity("policy", "Price check failed or service unavailable.");
+    } finally {
+      setIsCheckingPrice(false);
+    }
+  };
+
+  const executeServicePayment = async () => {
+    addActivity("mpp", `Authorizing payment for ${selectedService.name} (${selectedService.cost})`);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `Pay ${selectedService.cost} for ${selectedService.name}` }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [...prev, { role: "agent", text: data.content }]);
+    } catch (error: any) {
+      setMessages((prev) => [...prev, { role: "agent", text: `Error: ${error.message}` }]);
+    }
   };
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -182,7 +276,7 @@ function App() {
       ...prev,
       { role: "agent", text: `Compliance check passed. Total disbursement: ${totalAmount.toLocaleString()} ${currency}. Checking against max spend policy...` },
     ]);
-    addActivity("compliance", `Total ${totalAmount.toLocaleString()} ${currency} — checking against 30,000 USDC max spend limit`);
+    addActivity("compliance", `Total ${totalAmount.toLocaleString()} ${currency} — checking against ${maxSpendLimit}`);
     await sleep(800);
 
     if (totalAmount > 30000) {
@@ -505,6 +599,9 @@ function App() {
           <div className="side-panel">
             <div className="side-panel-header">
               <h3>Active Guardrails</h3>
+              <button type="button" className="button-alt small" onClick={fetchBalance} title="Refresh balance">
+                Refresh
+              </button>
             </div>
             <div className="policy-list">
               {policies.map((policy) => (
@@ -559,6 +656,34 @@ function App() {
                   <span className="mini-amount">{run.amount}</span>
                 </div>
               ))}
+            </div>
+          </div>
+          <div className="service-selector">
+            <h3>Compliance Services</h3>
+            <select
+              value={selectedService.id}
+              onChange={(e) => setSelectedService(mppServices.find(s => s.id === e.target.value)!)}
+            >
+              {mppServices.map(service => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+            <div className="service-cost">
+              Cost: <strong>{selectedService.cost}</strong>
+            </div>
+            <p className="text-small">{selectedService.description}</p>
+            <div className="service-actions">
+              <button
+                onClick={() => handlePriceCheck(selectedService.id)}
+                disabled={isCheckingPrice}
+              >
+                {isCheckingPrice ? "Checking..." : "Check Price"}
+              </button>
+              <button onClick={() => executeServicePayment()}>
+                Authorize & Pay
+              </button>
             </div>
           </div>
         </div>
