@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express, { Request, Response } from 'express';
 import { createAgent } from 'langchain';
 import { ChatOpenAI } from '@langchain/openai';
@@ -6,6 +7,16 @@ import { buildToolkit } from './agent.js';
 import 'dotenv/config';
 
 const app = express();
+
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+}));
+
 app.use(express.json());
 
 const toolkit = buildToolkit(process.env.ACCOUNT_ID!, process.env.PRIVATE_KEY!);

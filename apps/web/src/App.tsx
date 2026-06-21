@@ -240,31 +240,28 @@ function App() {
 
     setMessages((prev) => [...prev, { role: "user", text: cmd }]);
     setInput("");
+    setIsProcessing(true);
     addActivity("compliance", `Processing command: "${cmd}"`);
 
-    const cmdLower = cmd.toLowerCase();
-    const deptMatch = cmdLower.match(/(engineering|operations|contractors?)\s*(department)?/);
-    const currency = cmdLower.includes("hbar") ? "HBAR" : "USDC";
-    const department = deptMatch ? deptMatch[1] : "Engineering";
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: cmd }),
+      });
 
-    if (cmdLower.includes("disburse") || cmdLower.includes("pay") || cmdLower.includes("send salary") || cmdLower.includes("payroll")) {
-      const deptDisplay = department.charAt(0).toUpperCase() + department.slice(1).replace(/s$/, "");
-      await sleep(500);
-      setMessages((prev) => [...prev, { role: "agent", text: `Initiating payroll run for ${deptDisplay} department in ${currency}. Identifying employees from the whitelist...` }]);
-      addActivity("policy", `Payroll initiation: ${deptDisplay} department, ${currency}`);
-      await simulatePayrollRun(deptDisplay, currency);
-    } else if (cmdLower.includes("hello") || cmdLower.includes("hi") || cmdLower.includes("hey")) {
-      await sleep(400);
-      setMessages((prev) => [...prev, { role: "agent", text: "Hello! I'm your HedePay payroll agent. I can help disburse salaries, check policies, or review audit logs. Active guardrails: 30,000 USDC max per transfer, 42 whitelisted employees." }]);
-    } else if (cmdLower.includes("policy") || cmdLower.includes("guardrail") || cmdLower.includes("limit")) {
-      await sleep(400);
-      setMessages((prev) => [...prev, { role: "agent", text: "Active policies:\n- Max Spend Limit: 30,000 USDC per transfer\n- Employee Whitelist: 42 approved accounts\n- Department Scope: Engineering, Operations, Contractors\n- HCS Audit Hook: Live (all transactions logged immutably)" }]);
-    } else if (cmdLower.includes("audit") || cmdLower.includes("log") || cmdLower.includes("hcs")) {
-      await sleep(400);
-      setMessages((prev) => [...prev, { role: "agent", text: `Recent audit events logged to HCS. Last payroll cycle recorded on Topic 0.0.895234. All transactions are immutable and verifiable on the Hedera network.` }]);
-    } else {
-      await sleep(400);
-      setMessages((prev) => [...prev, { role: "agent", text: "I didn't recognize that command. Try saying:\n- \"Disburse monthly salaries to the Engineering department in USDC\"\n- \"Show active policies\"\n- \"View audit logs\"" }]);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || "Request failed");
+      }
+
+      const data = await res.json();
+      const agentText = typeof data.content === "string" ? data.content : JSON.stringify(data.content);
+      setMessages((prev) => [...prev, { role: "agent", text: agentText }]);
+    } catch (error: any) {
+      setMessages((prev) => [...prev, { role: "agent", text: `Error: ${error.message}` }]);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
