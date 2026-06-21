@@ -1,4 +1,3 @@
-import cors from 'cors';
 import express, { Request, Response } from 'express';
 import { createAgent } from 'langchain';
 import { ChatOpenAI } from '@langchain/openai';
@@ -8,14 +7,13 @@ import 'dotenv/config';
 
 const app = express();
 
-const allowedOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
-}));
+app.use((_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (_req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
 
 app.use(express.json());
 
