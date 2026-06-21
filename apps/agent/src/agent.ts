@@ -81,6 +81,7 @@ export function buildToolkit(accountId: string, privateKey: string) {
       tools: [
         // Use property access instead of string literals
         coreTokenPluginToolNames.AIRDROP_FUNGIBLE_TOKEN_TOOL,
+        coreTokenPluginToolNames.ASSOCIATE_TOKEN_TOOL,
         coreConsensusPluginToolNames.SUBMIT_TOPIC_MESSAGE_TOOL,
         "mppx_hedera_charge_fetch_tool",
         coreAccountQueryPluginToolNames.GET_HBAR_BALANCE_QUERY_TOOL,
