@@ -1,8 +1,8 @@
 {
-  "name": "@veherify/agent",
+  "name": "@hede-pay/agent",
   "version": "0.1.0",
   "private": true,
-  "description": "VeHERify — forensic AI agent for tracing media origins on Hedera",
+  "description": "Hede-pay — Payroll management system",
   "license": "Apache-2.0",
   "author": "carita",
   "type": "module",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@hashgraph/hedera-agent-kit": "^4.0.0",
     "@hashgraph/hedera-agent-kit-langchain": "^1.0.0",
+    "@hashgraph/hedera-agent-kit-mcp": "^1.0.0",
     "@hiero-ledger/sdk": "^2.84.0",
     "@langchain/groq": "^1.2.1",
     "@langchain/ollama": "^1.2.7",
