@@ -1,15 +1,16 @@
 import { Client, PrivateKey } from '@hiero-ledger/sdk';
 import { AgentMode } from '@hashgraph/hedera-agent-kit';
 import { HederaLangchainToolkit } from '@hashgraph/hedera-agent-kit-langchain';
-import {
-  coreAccountPlugin,
-  coreConsensusPluginToolNames,
-  coreTokenPlugin,
-  coreConsensusPlugin,
-  coreAccountQueryPlugin,
-  coreAccountQueryPluginToolNames,
-  coreTokenPluginToolNames
-} from '@hashgraph/hedera-agent-kit/plugins';
+// import {
+//   coreAccountPlugin,
+//   coreConsensusPluginToolNames,
+//   coreTokenPlugin,
+//   coreConsensusPlugin,
+//   coreAccountQueryPlugin,
+//   coreAccountQueryPluginToolNames,
+//   coreTokenPluginToolNames
+// } from '@hashgraph/hedera-agent-kit/plugins';
+import { allCorePlugins } from '@hashgraph/hedera-agent-kit/plugins';
 import { mppxHederaPlugin } from 'hak-mppx-hedera-plugin';
 
 export class PayrollSpendLimitPolicy {
@@ -77,18 +78,20 @@ export function buildToolkit(accountId: string, privateKey: string) {
   return new HederaLangchainToolkit({
     client,
     configuration: {
-      plugins: [coreAccountPlugin, coreTokenPlugin, coreAccountQueryPlugin, coreConsensusPlugin, mppxHederaPlugin],
-      tools: [
-        // Use property access instead of string literals
-        coreTokenPluginToolNames.AIRDROP_FUNGIBLE_TOKEN_TOOL,
-        coreTokenPluginToolNames.ASSOCIATE_TOKEN_TOOL,
-        coreConsensusPluginToolNames.SUBMIT_TOPIC_MESSAGE_TOOL,
-        "mppx_hedera_charge_fetch_tool",
-        coreAccountQueryPluginToolNames.GET_HBAR_BALANCE_QUERY_TOOL,
+      //plugins: [coreAccountPlugin, coreTokenPlugin, coreAccountQueryPlugin, coreConsensusPlugin, mppxHederaPlugin],
+      plugins: [...allCorePlugins, mppxHederaPlugin],
+      // tools: [
+      //   // Use property access instead of string literals
+      //   coreTokenPluginToolNames.AIRDROP_FUNGIBLE_TOKEN_TOOL,
+      //   coreTokenPluginToolNames.ASSOCIATE_TOKEN_TOOL,
+      //   coreConsensusPluginToolNames.SUBMIT_TOPIC_MESSAGE_TOOL,
+      //   "mppx_hedera_charge_fetch_tool",
+      //   coreAccountQueryPluginToolNames.GET_HBAR_BALANCE_QUERY_TOOL,
 
-        //Commented out to ensure the agent does not create additional topics.
-        //coreConsensusPluginToolNames.CREATE_TOPIC_TOOL,       
-      ],
+      //   //Commented out to ensure the agent does not create additional topics.
+      //   //coreConsensusPluginToolNames.CREATE_TOPIC_TOOL,       
+      // ],
+      tools: [],
 
       policies: [spendLimit], // Step 4 Guardrail
       hooks: [auditLog],      // Step 5 Transparency
