@@ -96,7 +96,7 @@ Once the agent is running in its REPL or connected to the web UI, you can issue 
 ## **📝 Feedback & Hosting**
 
 *   **Feedback:** A detailed developer experience report is included in `FEEDBACK.md` [Turn 21].
-*   **Live Demo:** The agent is hosted at `[YOUR_DEPLOYED_URL]` and will remain active for at least 90 days following submission [Turn 18].
+*   **Live Demo:** The agent is hosted at `https://hede-pay-fzt7q.ondigitalocean.app/` and will remain active for at least 90 days following submission [Turn 18].
 
 ---
 
