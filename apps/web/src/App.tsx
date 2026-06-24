@@ -391,6 +391,7 @@ function App() {
           <p>
             HedePay automates payroll disbursements using Hedera policies and immutable HCS audit trails. The result is secure salary payment, compliance enforcement, and transparent reporting in a single enterprise dashboard.
           </p>
+          <h3>Note: User Authentication is still open, just login with any randon email and password to access the agent</h3>
           <div className="hero-actions landing-actions">
             <button type="button" onClick={() => navigate("signup")}>Get started</button>
             <button type="button" className="button-alt" onClick={() => navigate("login")}>Login</button>
@@ -494,6 +495,7 @@ function App() {
           </div>
           <form className="auth-form" onSubmit={(event) => { event.preventDefault(); navigate("dashboard"); }}>
             <label>
+              <p>(sign in with a random email and password, auth is still open)</p>
               Email
               <input type="email" placeholder="name@company.com" required />
             </label>
