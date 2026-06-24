@@ -417,8 +417,7 @@ function App() {
         <div className="overview-card">
           <h2>What is HedePay?</h2>
           <p>
-            HedePay is a governed payroll agent built on the Hedera Agent Kit. It automates enterprise salary disbursements while enforcing max-spend and whitelist policies, and records every action on the Hedera Consensus Service for auditability.
-          </p>
+            HedePay is an autonomous financial agent built on the Hedera Agent Kit designed to automate enterprise payroll disbursements in HBAR and USDC. It transforms complex salary workflows into transparent, agentic operations, ensuring every payment is secure and verifiable across the Hedera network. </p>
         </div>
         <div className="overview-card">
           <h2>Why choose HedePay?</h2>
@@ -431,7 +430,8 @@ function App() {
       <section className="landing-grid" id="features">
         <article className="landing-card">
           <h3>Governed Disbursements</h3>
-          <p>Only authorized accounts receive payments, and every transfer is checked against active spend policy rules.</p>
+          <p>Every payout is strictly regulated by the MaxRecipientsPolicy to prevent massive unauthorized transfers and the RejectToolPolicy to explicitly disable high-risk actions
+            . This ensures that only authorized, controlled distributions occur. </p>
         </article>
         <article className="landing-card">
           <h3>Immutable Audits</h3>

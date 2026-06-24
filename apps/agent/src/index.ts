@@ -41,9 +41,9 @@ if (process.env.USE_OLLAMA === 'true') {
 
 // 4. Initialize the agent using the createAgent pattern
 const agent = createAgent({
-  model: llm, // createAgent uses 'model' instead of 'llm'
+  model: llm,
   tools: toolkit.getTools() as any,
-  // createAgent uses 'systemPrompt' instead of 'messageModifier'
+ 
   systemPrompt: `You are HedePay, a payroll agent on the Hedera network. 
   Operator: ${process.env.ACCOUNT_ID}. 
   Always use HCS to log disbursements and MPPX for tax API calls.`,
