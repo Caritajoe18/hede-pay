@@ -1,6 +1,6 @@
 # **HedePay: The Autonomous Hedera Payroll Agent**
 
-**HedePay** is a governed, autonomous financial agent built using the **Hedera Agent Kit (v4)**. It is designed to automate enterprise payroll disbursements in HBAR and USDC while enforcing strict compliance via **Hooks and Policies**. By leveraging the **Hedera Consensus Service (HCS)** for immutable audit trails and the **Machine Payments Protocol (MPP)** for tax compliance APIs, HedePay ensures that every salary payment is verifiable, transparent, and secure.
+**HedePay** is an autonomous financial agent built using the **Hedera Agent Kit (v4)**. It is designed to automate enterprise payroll disbursements in HBAR and USDC while enforcing strict compliance via **Hooks and Policies**. By leveraging the **Hedera Consensus Service (HCS)** for immutable audit trails and the **Machine Payments Protocol (MPP)** for tax compliance APIs, HedePay ensures that every salary payment is verifiable, transparent, and secure.
 
 This project is submitted for the **"Hedera Policy Agent"** bounty, demonstrating practical use cases for AI agents purchasing real services while operating under runtime constraints.
 
@@ -8,7 +8,7 @@ This project is submitted for the **"Hedera Policy Agent"** bounty, demonstratin
 
 ### **Table of Contents**
 *   [Key Features](#key-features)
-*   [Live Demo](#live-demo)
+*   [Hosted UI Url](https://hede-pay-fzt7q.ondigitalocean.app/)
 *   [Tech Stack](#tech-stack)
 *   [Project Structure](#project-structure)
 *   [Getting Started](#getting-started)
