@@ -1,69 +1,14 @@
 import { Client, PrivateKey } from '@hiero-ledger/sdk';
 import { AgentMode } from '@hashgraph/hedera-agent-kit';
 import { HederaLangchainToolkit } from '@hashgraph/hedera-agent-kit-langchain';
-// import {
-//   coreAccountPlugin,
-//   coreConsensusPluginToolNames,
-//   coreTokenPlugin,
-//   coreConsensusPlugin,
-//   coreAccountQueryPlugin,
-//   coreAccountQueryPluginToolNames,
-//   coreTokenPluginToolNames
-// } from '@hashgraph/hedera-agent-kit/plugins';
+import { HcsAuditTrailHook } from '@hashgraph/hedera-agent-kit/hooks';
+import {
+  MaxRecipientsPolicy,
+  RejectToolPolicy
+} from '@hashgraph/hedera-agent-kit/policies';
+
 import { allCorePlugins } from '@hashgraph/hedera-agent-kit/plugins';
 import { mppxHederaPlugin } from 'hak-mppx-hedera-plugin';
-
-export class PayrollSpendLimitPolicy {
-  private limit: number;
-
-  constructor(limit: number) {
-    this.limit = limit;
-  }
-
-  async onAfterParameterNormalization(tool: any, params: any) {
-    const targetedTools = [
-      'AIRDROP_FUNGIBLE_TOKEN_TOOL',
-      'TRANSFER_FUNGIBLE_TOKEN_WITH_ALLOWANCE_TOOL'
-    ];
-
-    if (targetedTools.includes(tool.name)) {
-      const amount = Number(params.amount || 0);
-
-      if (amount > this.limit) {
-        throw new Error(
-          `Guardrail Violation: Requested transfer of ${amount} exceeds the limit of ${this.limit} USDC.`
-        );
-      }
-    }
-    return { success: true };
-  }
-}
-
-export class HedePayAuditHook {
-  private topicId: string;
-
-  constructor(topicId: string) {
-    this.topicId = topicId;
-  }
-
-  async onAfterToolExecution(tool: any, result: any) {
-    // We only log successful on-chain transactions
-    if (result && result.transactionId) {
-      const logMessage = JSON.stringify({
-        agent: "HedePay-MVP",
-        action: tool.name,
-        status: "SUCCESS",
-        txId: result.transactionId,
-        timestamp: new Date().toISOString()
-      });
-
-      // Note: In a production environment, you would call the 
-      // SUBMIT_TOPIC_MESSAGE_TOOL here via the agent instance [8].
-      console.log(`[HCS Audit Log]: ${logMessage}`);
-    }
-  }
-}
-
 
 
 export function buildToolkit(accountId: string, privateKey: string) {
@@ -72,29 +17,35 @@ export function buildToolkit(accountId: string, privateKey: string) {
     PrivateKey.fromStringECDSA(privateKey)
   );
 
-  const spendLimit = new PayrollSpendLimitPolicy(1000);
-  const auditLog = new HedePayAuditHook(process.env.HCS_TOPIC_ID!);
+  // 1. Initialize MaxRecipientsPolicy: Limits transfers to 5 recipients at once [4, 5]
+  const recipientLimit = new MaxRecipientsPolicy(50);
+
+  // 2. Initialize RejectToolPolicy: Explicitly blocks high-risk tools [4, 6]
+  const safetyPolicy = new RejectToolPolicy([
+    'delete_account',
+    'freeze_token',
+    'delete_topic'
+  ]);
+  const auditTrailHook = new HcsAuditTrailHook(
+    [
+      'transfer_hbar',
+      'airdrop_fungible_token',
+      'mppx_hedera_charge_fetch_tool' // You can audit 3rd party tools too!
+    ],
+    // The HCS Topic ID where logs will be sent
+    process.env.HCS_TOPIC_ID!,
+  );
+
 
   return new HederaLangchainToolkit({
     client,
     configuration: {
       //plugins: [coreAccountPlugin, coreTokenPlugin, coreAccountQueryPlugin, coreConsensusPlugin, mppxHederaPlugin],
       plugins: [...allCorePlugins, mppxHederaPlugin],
-      // tools: [
-      //   // Use property access instead of string literals
-      //   coreTokenPluginToolNames.AIRDROP_FUNGIBLE_TOKEN_TOOL,
-      //   coreTokenPluginToolNames.ASSOCIATE_TOKEN_TOOL,
-      //   coreConsensusPluginToolNames.SUBMIT_TOPIC_MESSAGE_TOOL,
-      //   "mppx_hedera_charge_fetch_tool",
-      //   coreAccountQueryPluginToolNames.GET_HBAR_BALANCE_QUERY_TOOL,
-
-      //   //Commented out to ensure the agent does not create additional topics.
-      //   //coreConsensusPluginToolNames.CREATE_TOPIC_TOOL,       
-      // ],
       tools: [],
 
-      policies: [spendLimit], // Step 4 Guardrail
-      hooks: [auditLog],      // Step 5 Transparency
+      policies: [recipientLimit, safetyPolicy],  // Step 4 Guardrail
+      hooks: [auditTrailHook],      // Step 5 Transparency
       context: {
         mode: AgentMode.AUTONOMOUS, // Mandatory for MPP and automated payroll [5]
         accountId: accountId,
