@@ -1,46 +1,67 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-const INITIAL_MPP_SERVICES = [
+const MPP_TOOLS = [
   {
-    id: "tax_calc",
-    name: "Global Tax Compliance API",
-    url: "https://api.tax-service.com/v1/calculate",
-    cost: "Unknown",
-    description: "Real-time tax withholding calculation"
+    id: "charge_fetch",
+    name: "One-Shot API Payment",
+    tool: "mppx_hedera_charge_fetch_tool",
+    description: "Call a 402-protected API, auto-pay with USDC, return the data",
+    params: "url, method, body, maxAmount",
   },
   {
-    id: "ai_summary",
-    name: "HedePay AI Auditor (GPT-4o)",
-    url: "https://mpp-proxy.com/openai/v1/chat/completions",
-    cost: "Unknown",
-    description: "Generate natural language payroll summaries"
+    id: "session_open",
+    name: "Open Payment Channel",
+    tool: "mppx_hedera_session_open_tool",
+    description: "Deposit USDC into escrow for fast session-based API calls",
+    params: "url, deposit",
   },
   {
-    id: "id_verify",
-    name: "Terminal 3 Identity Verification",
-    url: "https://api.t3n.network/verify",
-    cost: "Unknown",
-    description: "Verify employee proof-of-personhood"
-  }
+    id: "session_fetch",
+    name: "Session API Call",
+    tool: "mppx_hedera_session_fetch_tool",
+    description: "Make an API call using an open session (off-chain voucher, <1ms)",
+    params: "url, method, body",
+  },
+  {
+    id: "session_close",
+    name: "Close Payment Channel",
+    tool: "mppx_hedera_session_close_tool",
+    description: "Settle on-chain, refund unused deposit",
+    params: "url",
+  },
 ];
-const payRuns = [
+type PayRun = {
+  name: string;
+  status: string;
+  amount: string;
+};
+
+const MPP_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+const SAMPLE_ENDPOINTS = [
   {
-    name: "Engineering Payroll",
-    date: "Jun 18, 2026",
-    status: "Settled",
-    amount: "141,200 USDC",
+    id: "tax",
+    name: "Tax Compliance API (Payroll)",
+    url: "https://api.tax-compliance-provider.com/v1/payroll",
+    displayUrl: "api.tax-compliance-provider.com/v1/payroll",
+    cost: "TBD",
+    icon: "📊",
   },
   {
-    name: "Operations Payroll",
-    date: "Jun 17, 2026",
-    status: "Review Required",
-    amount: "92,400 USDC",
+    id: "openai",
+    name: "OpenAI Proxy (Chatbot)",
+    url: `${MPP_BASE}/openai/v1/chat/completions`,
+    displayUrl: "/openai/v1/chat/completions",
+    cost: "$0.005",
+    icon: "🤖",
   },
   {
-    name: "Contractor Disbursements",
-    date: "Jun 15, 2026",
-    status: "Approved",
-    amount: "31,800 USDC",
+    id: "stripe",
+    name: "Stripe Proxy (Payment Processing)",
+    url: `${MPP_BASE}/stripe/v1/charges`,
+    displayUrl: "/stripe/v1/charges",
+    cost: "$0.01",
+    icon: "💳",
   },
 ];
 
@@ -83,55 +104,38 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    fetchBalance();
+  const fetchRecentRuns = useCallback(async () => {
+    setIsFetchingRuns(true);
+    try {
+      const topicId = import.meta.env.VITE_HCS_TOPIC || "0.0.9298689";
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `List recent payroll runs from HCS topic ${topicId}. For each run give me the name, status, and amount. Format each as name|status|amount on a separate line.` }),
+      });
+      const data = await res.json();
+      const lines: string[] = (data.content || "").split("\n").filter((l: string) => l.includes("|"));
+      const runs: PayRun[] = lines.map((l: string) => {
+        const [name, status, amount] = l.split("|").map((s: string) => s.trim());
+        return { name, status, amount };
+      }).filter((r: PayRun) => r.name && r.status && r.amount);
+      if (runs.length > 0) setPayRuns(runs);
+    } catch {
+      // silent — keep empty state
+    } finally {
+      setIsFetchingRuns(false);
+    }
   }, []);
 
-  const summaryCards = [
-    {
-      title: "Treasury Balance",
-      value: hbarBalance,
-      detail: "Available HBAR for gas and payroll fees",
-    },
-    {
-      title: "Policy Status",
-      value: "Active",
-      detail: "Whitelist and max spend rules are enforced",
-    },
-    {
-      title: "Audit Trail",
-      value: "23 events",
-      detail: "Immutable HCS logs captured this month",
-    },
-    {
-      title: "Agent Mode",
-      value: "Autonomous",
-      detail: "Agent is monitoring payroll operations",
-    },
-  ];
-
-  const policies = [
-    {
-      label: "Max Spend Policy",
-      value: maxSpendLimit,
-      status: "Compliant",
-    },
-    {
-      label: "Whitelist Policy",
-      value: "42 approved accounts",
-      status: "Enabled",
-    },
-    {
-      label: "HCS Audit Hook",
-      value: "Live",
-      status: "Streaming",
-    },
-  ];
+  useEffect(() => {
+    fetchBalance();
+    fetchRecentRuns();
+  }, [fetchRecentRuns]);
 
   const guardrails = [
-    { label: "Max Spend Limit", value: maxSpendLimit },
-    { label: "Employee Whitelist", value: "42 approved accounts" },
-    { label: "Department Scope", value: "Engineering, Operations, Contractors" },
+    { label: "Max Recipients", value: "5 per transfer" },
+    { label: "Blocked Tools", value: "create_topic, delete_account" },
+    { label: "HCS Audit Topic", value: import.meta.env.VITE_HCS_TOPIC || "0.0.9298689" },
   ];
 
   const getViewFromHash = (): "landing" | "login" | "signup" | "dashboard" => {
@@ -150,7 +154,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
-      text: "Welcome to HedePay. I'm your payroll agent. Active guardrails: max 1000 HBar per transfer, How would you like to proceed?",
+      text: "Welcome to HedePay. I'm your payroll agent.\n\nHere's what I can do:\n• Pay salaries in USDC or HBAR to any Hedera account\n• Enforce safety policies (max 5 recipients per transfer, dangerous tools blocked)\n• Log every action to an immutable HCS audit trail\n• Fetch data from paid external services — for example, I can call a tax API to calculate withholdings, query an AI service to generate payroll summaries, or verify employee identities through a verification service. Just select an endpoint from the gallery or tell me which service to call.\n\nHow would you like to proceed?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -165,9 +169,14 @@ function App() {
   const [hcsTopic, setHcsTopic] = useState("0.0.0.0");
   const [payrollCycleId, setPayrollCycleId] = useState(0);
   const [payrollRunActive, setPayrollRunActive] = useState(false);
-  const [mppServices, setMppServices] = useState(INITIAL_MPP_SERVICES);
+  const [mppServices, setMppServices] = useState(MPP_TOOLS);
   const [isCheckingPrice, setIsCheckingPrice] = useState(false);
-  const [selectedService, setSelectedService] = useState(INITIAL_MPP_SERVICES[0]);
+  const [selectedService, setSelectedService] = useState(MPP_TOOLS[0]);
+  const [auditLogs, setAuditLogs] = useState<string | null>(null);
+  const [payRuns, setPayRuns] = useState<PayRun[]>([]);
+  const [isFetchingRuns, setIsFetchingRuns] = useState(false);
+  const [isFetchingAudit, setIsFetchingAudit] = useState(false);
+  const [runningEndpoint, setRunningEndpoint] = useState<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -196,7 +205,7 @@ function App() {
     addActivity("mpp", `Checking price for ${service.name}...`);
 
     try {
-      const prompt = `Ping ${service.url} using the mppx_hedera_charge_fetch_tool GET method. Do not execute the payment. Just tell me the exact USDC cost requested by the server's 402 challenge.`;
+      const prompt = `Use the ${service.tool} tool. Call it and tell me the cost or result.`;
 
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
         method: 'POST',
@@ -211,7 +220,7 @@ function App() {
       ));
 
       addActivity("mpp", `Service Cost Reported: ${data.content}`);
-      setMessages(prev => [...prev, { role: "agent", text: `The current fee for ${service.name} is ${data.content}.` }]);
+      setMessages(prev => [...prev, { role: "agent", text: `The result for ${service.name} is ${data.content}.` }]);
     } catch (error) {
       addActivity("policy", "Price check failed or service unavailable.");
     } finally {
@@ -220,17 +229,57 @@ function App() {
   };
 
   const executeServicePayment = async () => {
-    addActivity("mpp", `Authorizing payment for ${selectedService.name} (${selectedService.cost})`);
+    addActivity("mpp", `Executing ${selectedService.name} via ${selectedService.tool}`);
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `Pay ${selectedService.cost} for ${selectedService.name}` }),
+        body: JSON.stringify({ message: `Use the ${selectedService.tool} tool to call a test endpoint and tell me the result` }),
       });
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "agent", text: data.content }]);
     } catch (error: any) {
       setMessages((prev) => [...prev, { role: "agent", text: `Error: ${error.message}` }]);
+    }
+  };
+
+  const handleRunEndpoint = async (ep: typeof SAMPLE_ENDPOINTS[number]) => {
+    setRunningEndpoint(ep.id);
+    addActivity("mpp", `Agent fetching ${ep.name} via MPP charge...`);
+    const prompt = `Use the mppx_hedera_charge_fetch_tool to call ${ep.url} with method GET. If there is a 402 payment challenge, pay it automatically and return the response data.`;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: prompt }),
+      });
+      const data = await res.json();
+      addActivity("mpp", `${ep.name} responded`);
+      setMessages((prev) => [...prev, { role: "agent", text: data.content }]);
+    } catch {
+      addActivity("policy", `Failed to fetch ${ep.name}`);
+    } finally {
+      setRunningEndpoint(null);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    setIsFetchingAudit(true);
+    addActivity("hcs", "Requesting audit logs from HCS topic...");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Show me the recent audit trail logs from the HCS topic. What transactions have been logged?" }),
+      });
+      const data = await res.json();
+      setAuditLogs(data.content);
+      addActivity("hcs", "Audit logs retrieved");
+      setMessages((prev) => [...prev, { role: "agent", text: data.content }]);
+    } catch (error: any) {
+      addActivity("hcs", "Failed to fetch audit logs");
+    } finally {
+      setIsFetchingAudit(false);
     }
   };
 
@@ -600,22 +649,48 @@ function App() {
         <div className="dash-side">
           <div className="side-panel">
             <div className="side-panel-header">
-              <h3>Active Guardrails</h3>
-              <button type="button" className="button-alt small" onClick={fetchBalance} title="Refresh balance">
-                Refresh
-              </button>
+              <h3>Autonomous Compliance & Service Fetching</h3>
             </div>
-            <div className="policy-list">
-              {policies.map((policy) => (
-                <article key={policy.label} className="policy-card">
-                  <div>
-                    <p>{policy.label}</p>
-                    <strong>{policy.value}</strong>
+            <p className="text-small" style={{marginBottom:'14px',color:'var(--muted)'}}>Select an endpoint and the agent will fetch it via MPP — it handles 402 payment challenges automatically.</p>
+            <p className="text-small" style={{marginBottom:'14px',padding:'10px',borderRadius:'12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.15)',color:'#b91c1c',fontSize:'0.78rem',lineHeight:1.5}}>Note: USDC is not enabled on Hedera testnet, so MPP payment flows will fail. These samples demonstrate the intended flow for mainnet deployment.</p>
+            <div className="gallery-cards">
+              {SAMPLE_ENDPOINTS.map((ep) => (
+                <div key={ep.id} className={`endpoint-card ${runningEndpoint === ep.id ? "loading" : ""}`}>
+                  <span className="endpoint-icon">{ep.icon}</span>
+                  <div className="endpoint-info">
+                    <strong>{ep.name}</strong>
+                    <span className="endpoint-url">{ep.displayUrl}</span>
+                    <span className="endpoint-cost">Cost: {ep.cost}</span>
                   </div>
-                  <span>{policy.status}</span>
-                </article>
+                  <button
+                    className="endpoint-run-btn"
+                    onClick={() => handleRunEndpoint(ep)}
+                    disabled={runningEndpoint !== null}
+                  >
+                    {runningEndpoint === ep.id ? "Running..." : "Run"}
+                  </button>
+                </div>
               ))}
             </div>
+          </div>
+
+          <div className="side-panel">
+            <div className="side-panel-header">
+              <h3>Audit Trail</h3>
+              <button
+                type="button"
+                className="button-alt small"
+                onClick={fetchAuditLogs}
+                disabled={isFetchingAudit}
+              >
+                {isFetchingAudit ? "Fetching..." : "View Logs"}
+              </button>
+            </div>
+            {auditLogs ? (
+              <p className="text-small" style={{lineHeight:1.6,fontSize:'0.82rem'}}>{auditLogs}</p>
+            ) : (
+              <p className="text-small" style={{color:'var(--muted)'}}>Click "View Logs" to fetch the HCS audit trail from the agent.</p>
+            )}
           </div>
 
           <div className="side-panel">
@@ -644,6 +719,9 @@ function App() {
           <div className="side-panel">
             <div className="side-panel-header">
               <h3>Recent Runs</h3>
+              <button type="button" className="button-alt small" onClick={fetchRecentRuns} disabled={isFetchingRuns}>
+                {isFetchingRuns ? "Loading..." : "Refresh"}
+              </button>
             </div>
             <div className="table-list mini-table">
               <div className="table-row header-row">
@@ -651,41 +729,19 @@ function App() {
                 <span>Status</span>
                 <span>Amount</span>
               </div>
-              {payRuns.map((run) => (
-                <div key={run.name} className="table-row mini-row">
-                  <span className="mini-name">{run.name}</span>
-                  <span className={`mini-status ${run.status === "Settled" ? "status-settled" : run.status === "Approved" ? "status-approved" : "status-review"}`}>{run.status}</span>
-                  <span className="mini-amount">{run.amount}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="service-selector">
-            <h3>Compliance Services</h3>
-            <select
-              value={selectedService.id}
-              onChange={(e) => setSelectedService(mppServices.find(s => s.id === e.target.value)!)}
-            >
-              {mppServices.map(service => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-            <div className="service-cost">
-              Cost: <strong>{selectedService.cost}</strong>
-            </div>
-            <p className="text-small">{selectedService.description}</p>
-            <div className="service-actions">
-              <button
-                onClick={() => handlePriceCheck(selectedService.id)}
-                disabled={isCheckingPrice}
-              >
-                {isCheckingPrice ? "Checking..." : "Check Price"}
-              </button>
-              <button onClick={() => executeServicePayment()}>
-                Authorize & Pay
-              </button>
+              {payRuns.length === 0 ? (
+                <p className="text-small" style={{color:'var(--muted)',padding:'12px 14px'}}>
+                  {isFetchingRuns ? "Loading..." : "No runs yet"}
+                </p>
+              ) : (
+                payRuns.map((run, i) => (
+                  <div key={i} className="table-row mini-row">
+                    <span className="mini-name">{run.name}</span>
+                    <span className={`mini-status ${run.status === "Settled" ? "status-settled" : run.status === "Approved" ? "status-approved" : "status-review"}`}>{run.status}</span>
+                    <span className="mini-amount">{run.amount}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

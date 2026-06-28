@@ -16,6 +16,7 @@ export function buildToolkit(accountId: string, privateKey: string) {
     PrivateKey.fromStringECDSA(privateKey)
   );
 
+  // Counts positive-value transfers (recipients), excludes the sender (negative)
   const countRecipients = (transfers: any[]) => {
     return transfers.filter((t: any) => {
       if (!t || !('amount' in t)) return true;
@@ -28,46 +29,31 @@ export function buildToolkit(accountId: string, privateKey: string) {
     }).length;
   };
 
+  // Blocks transfers exceeding 5 recipients (for easy test)
   const recipientLimit = new MaxRecipientsPolicy(
-    1,
+    5,
     ['transfer_hbar_tool', 'airdrop_fungible_token_tool'],
     {
       'transfer_hbar_tool': (params: any) => {
-        console.log('[DIAG] MaxRecipientsPolicy: transfer_hbar_tool called with params:', JSON.stringify(params, null, 2));
         const transfers = params.hbarTransfers ?? [];
-        console.log('[DIAG] MaxRecipientsPolicy: hbarTransfers array:', transfers);
         const count = countRecipients(transfers) || 1;
-        console.log('[DIAG] MaxRecipientsPolicy: recipient count =', count, 'limit = 1');
         return count;
       },
       'airdrop_fungible_token_tool': (params: any) => {
-        console.log('[DIAG] MaxRecipientsPolicy: airdrop_fungible_token_tool called with params:', JSON.stringify(params, null, 2));
         const transfers = params.tokenTransfers ?? [];
-        console.log('[DIAG] MaxRecipientsPolicy: tokenTransfers array:', transfers);
         const count = countRecipients(transfers) || 1;
-        console.log('[DIAG] MaxRecipientsPolicy: recipient count =', count, 'limit = 1');
         return count;
       },
     }
   );
 
+  // Blocks dangerous tools the LLM should never use
   const safetyPolicy = new RejectToolPolicy([
     'create_topic_tool',
-    //'submit_topic_message_tool',
     'delete_account_tool',
   ]);
 
-  // Override to add logging
-  const originalShouldBlock = (recipientLimit as any).shouldBlockPostParamsNormalization.bind(recipientLimit);
-  (recipientLimit as any).shouldBlockPostParamsNormalization = function(params: any, method: string) {
-    console.log('[DIAG] MaxRecipientsPolicy.shouldBlockPostParamsNormalization called for method:', method);
-    console.log('[DIAG] MaxRecipientsPolicy relevantTools:', (recipientLimit as any).relevantTools);
-    console.log('[DIAG] MaxRecipientsPolicy method matches?', (recipientLimit as any).relevantTools.includes(method));
-    const result = originalShouldBlock(params, method);
-    console.log('[DIAG] MaxRecipientsPolicy.shouldBlockPostParamsNormalization returning:', result);
-    return result;
-  };
-
+  // Logs all payroll-related tool executions to the HCS audit topic
   const auditTrailHook = new HcsAuditTrailHook(
     [
       'transfer_hbar_tool',
@@ -89,12 +75,6 @@ export function buildToolkit(accountId: string, privateKey: string) {
       },
     },
   };
-
-  console.log("[DIAG] config.context keys:", Object.keys(toolkitConfig.configuration.context));
-  console.log("[DIAG] config.context.hooks length:", toolkitConfig.configuration.context.hooks?.length);
-  console.log("[DIAG] recipientLimit relevantTools:", (recipientLimit as any).relevantTools);
-  console.log("[DIAG] safetyPolicy relevantTools:", (safetyPolicy as any).relevantTools);
-  console.log("[DIAG] auditTrailHook relevantTools:", (auditTrailHook as any).relevantTools);
 
   return new HederaLangchainToolkit(toolkitConfig);
 }

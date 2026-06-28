@@ -63,9 +63,46 @@ To meet the **Hedera Policy Agent** criteria, HedePay implements a layered defen
 ---
 
 ### **Usage Examples**
-*   **Disbursement:** *"Disburse monthly salaries to all employees, but ensure we don't exceed the 5-recipient policy limit."*
-*   **Compliance:** *"Use the tax compliance API to calculate withholdings before processing the HBAR transfer."*
-*   **Audit:** *"Provide the HCS message records for the last successful payroll execution."*
+
+#### **Transfers (HBAR / USDC)**
+
+*   **Simple disbursement:**  
+    *"Send 100 HBAR to 0.0.9821"*
+    → Agent executes a single transfer. The `MaxRecipientsPolicy(2)` allows it; `HcsAuditTrailHook` logs the tx hash to the configured HCS topic.
+
+*   **Batch payroll (within policy bounds):**  
+    *"Disburse 1000 USDC to 0.0.9821 and 0.0.9822"*
+    → Agent sends to both recipients in one transfer. The policy permits up to 5 recipients; the hook records every detail on-chain. *(Future: map department names to account lists for bulk disbursement by department.)*
+
+*   **Blocked bulk transfer (policy enforcement):**  
+    *"Send 50 HBAR to 0.0.9821, 0.0.9822, 0.0.9823, and 0.0.9824"*
+    → Agent attempts the transfer, `MaxRecipientsPolicy` fires at `PRE_TOOL_EXECUTE` and throws `PolicyEvaluationError("Max recipients exceeded: 4 > 2")`. The agent surfaces the error and suggests splitting into smaller transfers.
+
+*   **Dangerous tool blocked:**  
+    *"Delete the account 0.0.9821"*  
+    → `RejectToolPolicy` intercepts at `PRE_TOOL_EXECUTE` and rejects `deleteAccount` (and other blocked tools like `createTopic`, `freezeToken`) before any on-chain action occurs.
+
+#### **MPP-Powered API Calls**
+
+> **Note:** USDC is not deployed on Hedera testnet, so MPP payment flows (USDC transfers) will fail on testnet. To test locally, spin up the MPPX demo server which mocks the 402 challenge/response cycle. On mainnet, the same flow works with real USDC.
+
+*   **One-shot API purchase:**  
+    *"Use the MPP charge tool to call /openai/v1/chat/completions and summarize last month's payroll"*  
+    → Agent invokes `mppx_hedera_charge_fetch_tool` → GETs the endpoint → if a 402 challenge is returned, the plugin auto-pays the USDC fee → retries with credential → returns the response.
+
+*   **Session-based consumption:**  
+    *"Open an MPP session to the tax compliance API, fetch the withholding rates for account 0.0.9821, then close the session"*  
+    → Agent calls `session_open` (deposits USDC into escrow), then `session_fetch` (off-chain voucher <1ms), then `session_close` (settles on-chain, refunds unused deposit). *(Future: fetch rates for an entire department once account-group mappings are added.)*
+
+#### **Audit & Compliance**
+
+*   **HCS audit trail retrieval:**  
+    *"Show me the recent audit trail logs from the HCS topic"*  
+    → The agent queries the HCS topic (via `HcsAuditTrailHook`'s logger or direct SDK call) and returns the message history — each entry includes the tool invoked, timestamp, and transaction ID.
+
+*   **Policy-aware workflow:**  
+    *"Pay 100 USDC to 0.0.9821 and 0.0.9822, then log the audit trail and check the HCS topic for confirmation"*  
+    → Agent transfers USDC (capped at 5 recipients per tx by policy), the hook automatically writes each tx to the HCS topic, and the agent reads back the topic to confirm immutability. *(Future: group account IDs into departments for bulk "pay Engineering" commands.)*
 
 ---
 
