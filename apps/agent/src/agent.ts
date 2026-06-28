@@ -13,72 +13,88 @@ import { mppxHederaPlugin } from 'hak-mppx-hedera-plugin';
 export function buildToolkit(accountId: string, privateKey: string) {
   const client = Client.forTestnet().setOperator(
     accountId,
-    // Note: ECDSA is required for MPPX plugin support (Source 62)
     PrivateKey.fromStringECDSA(privateKey)
   );
 
-  // 1. Robust MaxRecipientsPolicy Strategy
-  // We use multiple keys (recipients, hbarTransfers, tokenTransfers) to ensure
-  // the policy catches the count regardless of v3/v4 schema variations (Sources 154, 155).
-  const recipientTools = [
-    'transfer_hbar_tool', 'transfer_hbar',
-    'airdrop_fungible_token_tool', 'airdrop_fungible_token'
-  ];
+  const countRecipients = (transfers: any[]) => {
+    return transfers.filter((t: any) => {
+      if (!t || !('amount' in t)) return true;
+      const amt = t.amount;
+      if (amt && typeof amt === 'object') {
+        const bn = typeof amt.toBigNumber === 'function' ? amt.toBigNumber() : amt;
+        return typeof bn.isGreaterThan === 'function' ? bn.isGreaterThan(0) : Number(amt) > 0;
+      }
+      return Number(amt) > 0;
+    }).length;
+  };
 
   const recipientLimit = new MaxRecipientsPolicy(
-    2,
-    recipientTools,
+    1,
+    ['transfer_hbar_tool', 'airdrop_fungible_token_tool'],
     {
-      'transfer_hbar_tool': (params) => {
-        console.log('[DEBUG] Strategy triggered');
-        return (params.recipients || params.hbarTransfers || []).length || 1;
+      'transfer_hbar_tool': (params: any) => {
+        console.log('[DIAG] MaxRecipientsPolicy: transfer_hbar_tool called with params:', JSON.stringify(params, null, 2));
+        const transfers = params.hbarTransfers ?? [];
+        console.log('[DIAG] MaxRecipientsPolicy: hbarTransfers array:', transfers);
+        const count = countRecipients(transfers) || 1;
+        console.log('[DIAG] MaxRecipientsPolicy: recipient count =', count, 'limit = 1');
+        return count;
       },
-      'transfer_hbar': (params) => {
-        console.log('[DEBUG] Shorthand strategy triggered');
-        return (params.recipients || params.hbarTransfers || []).length || 1;
-      }
+      'airdrop_fungible_token_tool': (params: any) => {
+        console.log('[DIAG] MaxRecipientsPolicy: airdrop_fungible_token_tool called with params:', JSON.stringify(params, null, 2));
+        const transfers = params.tokenTransfers ?? [];
+        console.log('[DIAG] MaxRecipientsPolicy: tokenTransfers array:', transfers);
+        const count = countRecipients(transfers) || 1;
+        console.log('[DIAG] MaxRecipientsPolicy: recipient count =', count, 'limit = 1');
+        return count;
+      },
     }
   );
 
-  // 2. Hardened Safety Policies
-  // Added 'create_topic_tool' and 'submit_topic_message_tool' to ensure the agent 
   const safetyPolicy = new RejectToolPolicy([
-    'create_topic_tool', 'create_topic',
-    'submit_topic_message_tool', 'submit_topic_message',
-    'delete_account_tool', 'delete_account'
+    'create_topic_tool',
+    //'submit_topic_message_tool',
+    'delete_account_tool',
   ]);
-  // 3. Initialize HcsAuditTrailHook
-  // Topic must be pre-created and allow submissions from the operator (Sources 124, 201).
+
+  // Override to add logging
+  const originalShouldBlock = (recipientLimit as any).shouldBlockPostParamsNormalization.bind(recipientLimit);
+  (recipientLimit as any).shouldBlockPostParamsNormalization = function(params: any, method: string) {
+    console.log('[DIAG] MaxRecipientsPolicy.shouldBlockPostParamsNormalization called for method:', method);
+    console.log('[DIAG] MaxRecipientsPolicy relevantTools:', (recipientLimit as any).relevantTools);
+    console.log('[DIAG] MaxRecipientsPolicy method matches?', (recipientLimit as any).relevantTools.includes(method));
+    const result = originalShouldBlock(params, method);
+    console.log('[DIAG] MaxRecipientsPolicy.shouldBlockPostParamsNormalization returning:', result);
+    return result;
+  };
+
   const auditTrailHook = new HcsAuditTrailHook(
     [
       'transfer_hbar_tool',
-      'transfer_hbar',
       'airdrop_fungible_token_tool',
-      'airdrop_fungible_token',
       'mppx_hedera_charge_fetch_tool',
-      'mppx_hedera_charge_fetch'
     ],
     process.env.HCS_TOPIC_ID!
   );
 
-  // 4. Toolkit Configuration
-  // CRITICAL: Hooks and policies MUST be registered in configuration.context.hooks 
-  // for the BaseTool lifecycle to find them 00).
   const toolkitConfig = {
     client,
     configuration: {
       plugins: [...allCorePlugins, mppxHederaPlugin],
-      policies: [recipientLimit, safetyPolicy],
-      hooks: [auditTrailHook],
       context: {
         mode: AgentMode.AUTONOMOUS,
-        accountId: accountId,
-        privateKey: privateKey,
-        // The individual tools look specifically at this array during Stage 1 and 3
+        accountId,
+        privateKey,
         hooks: [recipientLimit, safetyPolicy, auditTrailHook],
       },
     },
   };
+
+  console.log("[DIAG] config.context keys:", Object.keys(toolkitConfig.configuration.context));
+  console.log("[DIAG] config.context.hooks length:", toolkitConfig.configuration.context.hooks?.length);
+  console.log("[DIAG] recipientLimit relevantTools:", (recipientLimit as any).relevantTools);
+  console.log("[DIAG] safetyPolicy relevantTools:", (safetyPolicy as any).relevantTools);
+  console.log("[DIAG] auditTrailHook relevantTools:", (auditTrailHook as any).relevantTools);
 
   return new HederaLangchainToolkit(toolkitConfig);
 }
