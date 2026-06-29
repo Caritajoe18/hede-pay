@@ -659,6 +659,109 @@ button:hover,
   color: var(--accent);
 }
 
+/* ── Endpoint Gallery ── */
+
+.endpoint-gallery {
+  padding: 24px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(228, 184, 84, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+.gallery-header {
+  margin-bottom: 18px;
+}
+
+.gallery-header h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  color: var(--text);
+}
+
+.gallery-header p {
+  margin: 0;
+}
+
+.gallery-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.endpoint-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(245, 246, 249, 0.85);
+  border: 1px solid rgba(228, 184, 84, 0.12);
+  transition: border-color 0.2s;
+}
+
+.endpoint-card.loading {
+  border-color: var(--gold);
+  background: rgba(242, 216, 148, 0.12);
+}
+
+.endpoint-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.endpoint-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.endpoint-info strong {
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 4px;
+}
+
+.endpoint-url {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: "SF Mono", "Fira Code", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.endpoint-cost {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.endpoint-run-btn {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  border-radius: 30px;
+  border: 1px solid rgba(228, 184, 84, 0.3);
+  background: linear-gradient(135deg, rgba(228, 184, 84, 0.92), rgba(197, 153, 50, 0.88));
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.endpoint-run-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.endpoint-run-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Dashboard 2-column layout ── */
 
 .dash-layout {

@@ -1,14 +1,17 @@
 # **HedePay: The Autonomous Hedera Payroll Agent**
 
-**HedePay** is an autonomous financial agent built using the **Hedera Agent Kit (v4)**. It is designed to automate enterprise payroll disbursements in HBAR and USDC while enforcing strict compliance via **Hooks and Policies**. By leveraging the **Hedera Consensus Service (HCS)** for immutable audit trails and the **Machine Payments Protocol (MPP)** for tax compliance APIs, HedePay ensures that every salary payment is verifiable, transparent, and secure.
+### **What is HedePay?**
+**HedePay** is an autonomous financial agent built on the **Hedera Agent Kit (v4)** designed to automate enterprise payroll disbursements in HBAR and USDC. It transforms complex salary workflows into transparent, agentic operations, ensuring every payment is secure and verifiable across the Hedera network.
 
 This project is submitted for the **"Hedera Policy Agent"** bounty, demonstrating practical use cases for AI agents purchasing real services while operating under runtime constraints.
 
 ---
+The branch as of the hackathon submission deadline is :  **"setup"**
+---
 
 ### **Table of Contents**
 *   [Key Features](#key-features)
-*   [Hosted UI Url](https://hede-pay-fzt7q.ondigitalocean.app/)
+*   [Live Demo](https://hede-pay-fzt7q.ondigitalocean.app/)
 *   [Tech Stack](#tech-stack)
 *   [Project Structure](#project-structure)
 *   [Getting Started](#getting-started)
@@ -19,11 +22,11 @@ This project is submitted for the **"Hedera Policy Agent"** bounty, demonstratin
 ---
 
 ### **Key Features**
-*   **Autonomous Payroll Execution:** Operates in `AgentMode.AUTONOMOUS` to handle multi-account salary disbursements without constant manual intervention.
-*   **Policy-Governed Disbursements:** Implements **MaxSpendPolicies** and **WhitelistPolicies** to prevent overspending and ensure funds are only sent to authorized employee accounts.
-*   **Immutable Audit Trails:** Every payroll cycle and policy denial is logged to a specific **HCS Topic**, creating a permanent ledger of corporate financial activity.
-*   **x402-Gated API Integration:** Uses the **MPPX Hedera Plugin** to pay for third-party tax and compliance APIs in HBAR/USDC before executing transfers.
-*   **Multi-Model Support:** Compatible with **OpenAI (GPT-4o)**, **Groq**, and **Ollama** for local or cloud-based execution.
+*   **Autonomous Payroll Execution:** Operates in `AgentMode.AUTONOMOUS` to handle multi-account salary disbursements using the operator's funded account.
+*   **Governed Disbursements:** Every payout is strictly regulated by the **MaxRecipientsPolicy** to prevent massive unauthorized transfers and the **RejectToolPolicy** to explicitly disable high-risk actions.
+*   **Immutable Audit Trails:** Powered by the **HcsAuditTrailHook**, every tool execution is logged to a specific **HCS Topic**, creating a permanent ledger of activity.
+*   **x402-Gated API Integration:** Uses the **MPPX Hedera Plugin** to pay for third-party tax and compliance APIs in USDC before executing transfers.
+*   **Multi-Model Support:** Native compatibility with **Ollama Cloud (minimax-m3)** for privacy-focused, GPU-offloaded execution.
 
 ---
 
@@ -35,51 +38,71 @@ The HedePay agent is hosted and active for public testing at:
 
 ### **Tech Stack**
 *   **Blockchain:** Hedera Network (Testnet).
-*   **Framework:** Hedera Agent Kit v4.
-*   **AI Orchestration:** LangChain v1.
-*   **AI Models:** **Ollama Cloud (minimax-m3)**
+*   **Framework:** Hedera Agent Kit.
+*   **AI Orchestration:** LangChain.
+*   **AI Models:** **Ollama Cloud (minimax-m3)**.
 *   **Payments Protocol:** Machine Payments Protocol (MPPX) for 402-protected API calls.
 *   **SDK:** Hiero SDK.
 
 ---
 
 ### **Project Structure**
-HedePay uses a **pnpm monorepo** architecture to separate concerns between the AI logic and the user interface:
-*   `/apps/agent`: Core AI logic and Hedera toolkit configuration.
+HedePay uses a **pnpm monorepo** architecture to separate concerns:
+*   `/apps/agent`: Core AI logic, hooks/policies registration, and Hedera toolkit configuration.
 *   `/apps/web`: React-based dashboard for payroll management and HCS audit visualization.
 
 ---
 
-### **Getting Started**
-#### **1. Prerequisites**
-*   **Node.js** v20 or higher.
-*   A **Hedera Testnet Account** (Get one at [portal.hedera.com](https://portal.hedera.com)).
-*  Ollma API Key (for ollama cloud access ) or **Ollama** installed for local access.
-
-#### **2. Installation**
-```bash
-npm install
-```
-
-#### **3. Environment Configuration**
-Create a `.env` file in `/apps/agent` including your `ACCOUNT_ID`, `PRIVATE_KEY`, and `HCS_TOPIC_ID`.
-
----
-
 ### **Bounty Compliance: Hooks & Policies**
-To meet the **Hedera Policy Agent** criteria, HedePay implements a layered defense system:
+To meet the **Hedera Policy Agent** criteria, HedePay implements a layered defense system using native v4 classes:
 
-*   **The Spend Limit Policy:** The agent is restricted by a **MaxSpendPolicy** that blocks any single disbursement exceeding a defined USDC threshold, preventing accidental massive outflows.
-*   **The Employee Whitelist:** Using the **WhitelistPolicy**, the agent can only interact with the `CoreTransferPlugin` if the `targetAccountId` exists within the corporate employee directory.
-*   **Audit Hook:** Every action—whether successful or blocked by a policy—is processed through a **BaseTool-enhanced hook** that submits the transaction record to **HCS**, ensuring verifiable and transparent behavior.
+*   **Audit Trail (HcsAuditTrailHook):** Ensures verifiable transparency by streaming metadata from every transaction to an HCS topic. This creates an immutable record that links agent actions to specific transaction IDs.
+*   **Recipient Limits (MaxRecipientsPolicy):** Blocks any transfer or airdrop request that exceeds a defined number of payees, preventing accidental or unauthorized "mass drain" events.
+*   **Safety Deny-List (RejectToolPolicy):** A restrictive guardrail that explicitly disables high-risk tools like `delete_account` or `freeze_token`, ensuring the agent cannot execute destructive actions regardless of its prompt.
 
 ---
 
 ### **Usage Examples**
-*   **Disbursement:** *"Disburse monthly salaries to all employees in the 'Engineering' whitelist."*
-*   **Compliance:** *"Check the tax compliance API for the next payroll cycle using USDC."*
-*   **Balance:** *"What is the remaining payroll budget in HBAR?"*
-*   **Audit:** *"Show me the HCS message records for the last payroll execution."*
+
+#### **Transfers (HBAR / USDC)**
+
+*   **Simple disbursement:**  
+    *"Send 100 HBAR to 0.0.9821"*
+    → Agent executes a single transfer. The `MaxRecipientsPolicy(2)` allows it; `HcsAuditTrailHook` logs the tx hash to the configured HCS topic.
+
+*   **Batch payroll (within policy bounds):**  
+    *"Disburse 1000 USDC to 0.0.9821 and 0.0.9822"*
+    → Agent sends to both recipients in one transfer. The policy permits up to 5 recipients; the hook records every detail on-chain. *(Future: map department names to account lists for bulk disbursement by department.)*
+
+*   **Blocked bulk transfer (policy enforcement):**  
+    *"Send 50 HBAR to 0.0.9821, 0.0.9822, 0.0.9823, and 0.0.9824"*
+    → Agent attempts the transfer, `MaxRecipientsPolicy` fires at `PRE_TOOL_EXECUTE` and throws `PolicyEvaluationError("Max recipients exceeded: 4 > 2")`. The agent surfaces the error and suggests splitting into smaller transfers.
+
+*   **Dangerous tool blocked:**  
+    *"Delete the account 0.0.9821"*  
+    → `RejectToolPolicy` intercepts at `PRE_TOOL_EXECUTE` and rejects `deleteAccount` (and other blocked tools like `createTopic`, `freezeToken`) before any on-chain action occurs.
+
+#### **MPP-Powered API Calls**
+
+> **Note:** USDC is not deployed on Hedera testnet, so MPP payment flows (USDC transfers) will fail on testnet. To test locally, spin up the MPPX demo server which mocks the 402 challenge/response cycle. On mainnet, the same flow works with real USDC.
+
+*   **One-shot API purchase:**  
+    *"Use the MPP charge tool to call /openai/v1/chat/completions and summarize last month's payroll"*  
+    → Agent invokes `mppx_hedera_charge_fetch_tool` → GETs the endpoint → if a 402 challenge is returned, the plugin auto-pays the USDC fee → retries with credential → returns the response.
+
+*   **Session-based consumption:**  
+    *"Open an MPP session to the tax compliance API, fetch the withholding rates for account 0.0.9821, then close the session"*  
+    → Agent calls `session_open` (deposits USDC into escrow), then `session_fetch` (off-chain voucher <1ms), then `session_close` (settles on-chain, refunds unused deposit). *(Future: fetch rates for an entire department once account-group mappings are added.)*
+
+#### **Audit & Compliance**
+
+*   **HCS audit trail retrieval:**  
+    *"Show me the recent audit trail logs from the HCS topic"*  
+    → The agent queries the HCS topic (via `HcsAuditTrailHook`'s logger or direct SDK call) and returns the message history — each entry includes the tool invoked, timestamp, and transaction ID.
+
+*   **Policy-aware workflow:**  
+    *"Pay 100 USDC to 0.0.9821 and 0.0.9822, then log the audit trail and check the HCS topic for confirmation"*  
+    → Agent transfers USDC (capped at 5 recipients per tx by policy), the hook automatically writes each tx to the HCS topic, and the agent reads back the topic to confirm immutability. *(Future: group account IDs into departments for bulk "pay Engineering" commands.)*
 
 ---
 

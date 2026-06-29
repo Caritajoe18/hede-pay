@@ -10,47 +10,71 @@ import {
 import { allCorePlugins } from '@hashgraph/hedera-agent-kit/plugins';
 import { mppxHederaPlugin } from 'hak-mppx-hedera-plugin';
 
-
 export function buildToolkit(accountId: string, privateKey: string) {
   const client = Client.forTestnet().setOperator(
     accountId,
     PrivateKey.fromStringECDSA(privateKey)
   );
 
-  // 1. Initialize MaxRecipientsPolicy: Limits transfers to 5 recipients at once [4, 5]
-  const recipientLimit = new MaxRecipientsPolicy(50);
+  // Counts positive-value transfers (recipients), excludes the sender (negative)
+  const countRecipients = (transfers: any[]) => {
+    return transfers.filter((t: any) => {
+      if (!t || !('amount' in t)) return true;
+      const amt = t.amount;
+      if (amt && typeof amt === 'object') {
+        const bn = typeof amt.toBigNumber === 'function' ? amt.toBigNumber() : amt;
+        return typeof bn.isGreaterThan === 'function' ? bn.isGreaterThan(0) : Number(amt) > 0;
+      }
+      return Number(amt) > 0;
+    }).length;
+  };
 
-  // 2. Initialize RejectToolPolicy: Explicitly blocks high-risk tools [4, 6]
-  const safetyPolicy = new RejectToolPolicy([
-    'delete_account',
-    'freeze_token',
-    'delete_topic'
-  ]);
-  const auditTrailHook = new HcsAuditTrailHook(
-    [
-      'transfer_hbar',
-      'airdrop_fungible_token',
-      'mppx_hedera_charge_fetch_tool' // You can audit 3rd party tools too!
-    ],
-    // The HCS Topic ID where logs will be sent
-    process.env.HCS_TOPIC_ID!,
+  // Blocks transfers exceeding 5 recipients (for easy test)
+  const recipientLimit = new MaxRecipientsPolicy(
+    5,
+    ['transfer_hbar_tool', 'airdrop_fungible_token_tool'],
+    {
+      'transfer_hbar_tool': (params: any) => {
+        const transfers = params.hbarTransfers ?? [];
+        const count = countRecipients(transfers) || 1;
+        return count;
+      },
+      'airdrop_fungible_token_tool': (params: any) => {
+        const transfers = params.tokenTransfers ?? [];
+        const count = countRecipients(transfers) || 1;
+        return count;
+      },
+    }
   );
 
+  // Blocks dangerous tools the LLM should never use
+  const safetyPolicy = new RejectToolPolicy([
+    'create_topic_tool',
+    'delete_account_tool',
+  ]);
 
-  return new HederaLangchainToolkit({
+  // Logs all payroll-related tool executions to the HCS audit topic
+  const auditTrailHook = new HcsAuditTrailHook(
+    [
+      'transfer_hbar_tool',
+      'airdrop_fungible_token_tool',
+      'mppx_hedera_charge_fetch_tool',
+    ],
+    process.env.HCS_TOPIC_ID!
+  );
+
+  const toolkitConfig = {
     client,
     configuration: {
-      //plugins: [coreAccountPlugin, coreTokenPlugin, coreAccountQueryPlugin, coreConsensusPlugin, mppxHederaPlugin],
       plugins: [...allCorePlugins, mppxHederaPlugin],
-      tools: [],
-
-      policies: [recipientLimit, safetyPolicy],  // Step 4 Guardrail
-      hooks: [auditTrailHook],      // Step 5 Transparency
       context: {
-        mode: AgentMode.AUTONOMOUS, // Mandatory for MPP and automated payroll [5]
-        accountId: accountId,
-        privateKey: privateKey
+        mode: AgentMode.AUTONOMOUS,
+        accountId,
+        privateKey,
+        hooks: [recipientLimit, safetyPolicy, auditTrailHook],
       },
-    } as any,
-  });
+    },
+  };
+
+  return new HederaLangchainToolkit(toolkitConfig);
 }
